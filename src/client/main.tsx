@@ -2,19 +2,9 @@ import { StrictMode, useEffect, useState, type DragEvent, type FormEvent } from 
 import { createRoot } from "react-dom/client";
 import "./styles.css";
 
-const CATEGORIES = [
-  "Arbeitsmittel",
-  "Fahrtkosten/Entfernungspauschale",
-  "Fortbildungskosten",
-  "Bewerbungskosten",
-  "Homeoffice-Pauschale",
-  "Kontoführungsgebühren",
-  "Gewerkschafts-/Berufsverbandsbeiträge",
-  "Reisekosten",
-  "Sonstiges",
-] as const;
+const CATEGORY = "Aufwendungen für Arbeitsmittel" as const;
 
-type Category = (typeof CATEGORIES)[number];
+type Category = typeof CATEGORY;
 
 interface Receipt {
   id: string;
@@ -34,7 +24,7 @@ interface Receipt {
   invoice_number: string;
   payment_method: string;
   notes: string;
-  r2_key: string | null;
+  has_file: boolean;
   original_filename: string | null;
   mime_type: string | null;
   file_size: number | null;
@@ -44,10 +34,6 @@ interface Receipt {
 interface YearConfig {
   tax_year: number;
   gwg_limit_cents: number;
-  homeoffice_daily_cents: number;
-  homeoffice_max_days: number;
-  distance_first_20_km_cents: number;
-  distance_after_20_km_cents: number;
   updated_at: string;
 }
 
@@ -60,8 +46,8 @@ interface Suggestions {
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const response = await fetch(url, options);
   if (!response.ok) {
-    const body = await response.json().catch(() => ({ error: "Anfrage fehlgeschlagen" })) as { error?: string };
-    throw new Error(body.error || `HTTP ${response.status}`);
+    const body = await response.json().catch(() => ({ error: "Request failed" })) as { error?: string };
+    throw new Error(body.error || `Request failed (HTTP ${response.status})`);
   }
   return response.status === 204 ? undefined as T : response.json() as Promise<T>;
 }
@@ -112,7 +98,7 @@ function ReceiptEditor({
     try {
       const body = {
         status: draft.status,
-        category: draft.category,
+        category: CATEGORY,
         description: draft.description,
         amount_cents: draft.amount_cents,
         business_use_pct: draft.business_use_pct,
@@ -132,65 +118,63 @@ function ReceiptEditor({
       setDraft(result.receipt);
       onSaved(result.receipt);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Speichern fehlgeschlagen");
+      setError(reason instanceof Error ? reason.message : "Could not save the receipt");
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <div className="editor-shell" role="dialog" aria-modal="true" aria-label="Beleg bearbeiten">
-      <section className={`viewer-panel ${draft.r2_key ? "" : "no-file"}`}>
+    <div className="editor-shell" role="dialog" aria-modal="true" aria-label="Edit receipt">
+      <section className={`viewer-panel ${draft.has_file ? "" : "no-file"}`}>
         <div className="panel-head">
           <div>
             <span className="eyebrow">// ORIGINAL</span>
-            <h2>{draft.original_filename || "Ohne Datei"}</h2>
+            <h2>{draft.original_filename || "No file"}</h2>
           </div>
-          <button className="icon-button" type="button" onClick={onClose} aria-label="Schliessen">×</button>
+          <button className="icon-button" type="button" onClick={onClose} aria-label="Close">×</button>
         </div>
-        {draft.r2_key ? (
+        {draft.has_file ? (
           draft.mime_type?.startsWith("image/") ? (
-            <img className="receipt-image" src={`/api/receipts/${draft.id}/file`} alt="Belegvorschau" />
+            <img className="receipt-image" src={`/api/receipts/${draft.id}/file`} alt="Receipt preview" />
           ) : (
-            <iframe className="receipt-pdf" src={`/api/receipts/${draft.id}/file`} title="PDF-Belegvorschau" />
+            <iframe className="receipt-pdf" src={`/api/receipts/${draft.id}/file`} title="PDF receipt preview" />
           )
         ) : (
-          <div className="empty-viewer">Manueller Eintrag ohne Originaldatei</div>
+          <div className="empty-viewer">Manual entry without an original file</div>
         )}
       </section>
 
       <form className="editor-form" onSubmit={save}>
         <div className="panel-head sticky-head">
           <div>
-            <span className="eyebrow">// ANLAGE N</span>
-            <h2>Belegdaten</h2>
+            <span className="eyebrow">// OFFICIAL GERMAN TAX FORM FIELD</span>
+            <h2>Receipt details</h2>
           </div>
           <span className={`tag ${draft.status === "complete" ? "tag-complete" : ""}`}>
-            {draft.status === "complete" ? "Vollstaendig" : "Entwurf"}
+            {draft.status === "complete" ? "Complete" : "Draft"}
           </span>
         </div>
 
         {error && <p className="notice notice-error" role="alert">{error}</p>}
         {draft.gwg_flag === 1 && (
           <p className="notice notice-warning">
-            Betrag oberhalb der Jahres-GWG-Grenze. Dieser Beleg wird nicht in die Abzugssumme
-            aufgenommen; eine AfA muss separat geprueft werden.
+            This amount exceeds the year&apos;s immediate write-off threshold. The receipt is excluded
+            from the deductible total and must be reviewed separately for depreciation.
           </p>
         )}
 
         <div className="form-grid">
+          <div className="official-field span-2">
+            <span>Official German tax form field</span>
+            <strong>{CATEGORY}</strong>
+          </div>
           <label className="field span-2">
-            <span>Kategorie</span>
-            <select value={draft.category} onChange={(event) => set("category", event.target.value as Category)}>
-              {CATEGORIES.map((category) => <option key={category}>{category}</option>)}
-            </select>
-          </label>
-          <label className="field span-2">
-            <span>Beschreibung / Art des Arbeitsmittels</span>
+            <span>Description / type of work item</span>
             <input required maxLength={500} value={draft.description} onChange={(event) => set("description", event.target.value)} />
           </label>
           <label className="field">
-            <span>Betrag (EUR)</span>
+            <span>Amount (EUR)</span>
             <input
               required
               type="number"
@@ -202,7 +186,7 @@ function ReceiptEditor({
             />
           </label>
           <label className="field">
-            <span>Berufliche Nutzung (%)</span>
+            <span>Business use (%)</span>
             <input
               required
               type="number"
@@ -214,12 +198,12 @@ function ReceiptEditor({
             />
           </label>
           <div className="calculated span-2">
-            <span>Berechneter Anteil</span>
+            <span>Calculated deductible amount</span>
             <strong>{money(Math.round(draft.amount_cents * draft.business_use_pct / 100))}</strong>
-            <small>{draft.gwg_flag ? "Nicht in Summen, AfA pruefen" : "Wird in der Kategoriesumme verwendet"}</small>
+            <small>{draft.gwg_flag ? "Excluded from totals; review for depreciation" : "Included in the ledger total"}</small>
           </div>
           <label className="field">
-            <span>Belegdatum</span>
+            <span>Receipt date</span>
             <input
               required
               type="date"
@@ -234,46 +218,46 @@ function ReceiptEditor({
             />
           </label>
           <label className="field">
-            <span>Steuerjahr</span>
+            <span>Tax year</span>
             <input readOnly value={draft.tax_year} />
           </label>
           <label className="field span-2">
-            <span>Verkaeufer / Anbieter</span>
+            <span>Seller / vendor</span>
             <input maxLength={300} value={draft.seller_name} onChange={(event) => set("seller_name", event.target.value)} />
           </label>
           <label className="field span-2">
-            <span>Verkaeuferadresse</span>
+            <span>Seller address</span>
             <textarea rows={2} maxLength={1000} value={draft.seller_address} onChange={(event) => set("seller_address", event.target.value)} />
           </label>
           <label className="field">
-            <span>Rechnungsnummer</span>
+            <span>Invoice number</span>
             <input maxLength={200} value={draft.invoice_number} onChange={(event) => set("invoice_number", event.target.value)} />
           </label>
           <label className="field">
-            <span>Zahlungsart</span>
-            <input maxLength={100} value={draft.payment_method} onChange={(event) => set("payment_method", event.target.value)} placeholder="Karte, Ueberweisung, bar" />
+            <span>Payment method</span>
+            <input maxLength={100} value={draft.payment_method} onChange={(event) => set("payment_method", event.target.value)} placeholder="Card, bank transfer, cash" />
           </label>
           <label className="field span-2">
-            <span>Notizen</span>
+            <span>Notes</span>
             <textarea rows={4} maxLength={5000} value={draft.notes} onChange={(event) => set("notes", event.target.value)} />
           </label>
           <label className="field span-2">
             <span>Status</span>
             <select value={draft.status} onChange={(event) => set("status", event.target.value as Receipt["status"])}>
-              <option value="draft">Entwurf</option>
-              <option value="complete">Vollstaendig</option>
+              <option value="draft">Draft</option>
+              <option value="complete">Complete</option>
             </select>
           </label>
         </div>
 
         <div className="editor-actions">
           <button className="button button-primary" disabled={saving} type="submit">
-            {saving ? "Speichert..." : "Beleg speichern"}
+            {saving ? "Saving..." : "Save receipt"}
           </button>
-          <button className="button button-ghost" type="button" onClick={() => onDuplicate(draft)}>Duplizieren</button>
-          <button className="button button-danger" type="button" onClick={() => onDelete(draft)}>Loeschen</button>
+          <button className="button button-ghost" type="button" onClick={() => onDuplicate(draft)}>Duplicate</button>
+          <button className="button button-danger" type="button" onClick={() => onDelete(draft)}>Delete</button>
         </div>
-        <p className="owner-line">Datensatzinhaber: {draft.owner_email}</p>
+        <p className="owner-line">Record owner: {draft.owner_email}</p>
       </form>
     </div>
   );
@@ -294,36 +278,35 @@ function YearSettings({ config, onSaved }: { config: YearConfig; onSaved: (confi
         body: JSON.stringify(draft),
       });
       onSaved(result.config);
-      setMessage("Jahreswerte gespeichert.");
+      setMessage("Year settings saved.");
     } catch (reason) {
-      setMessage(reason instanceof Error ? reason.message : "Speichern fehlgeschlagen");
+      setMessage(reason instanceof Error ? reason.message : "Could not save year settings");
     }
   };
 
-  const number = (key: keyof YearConfig, label: string, cents = false) => (
-    <label className="field compact-field">
-      <span>{label}{cents ? " (Cent)" : ""}</span>
-      <input
-        type="number"
-        min="0"
-        step="1"
-        value={draft[key]}
-        onChange={(event) => setDraft((current) => ({ ...current, [key]: Number(event.target.value) }))}
-      />
-    </label>
-  );
-
   return (
     <details className="settings-card">
-      <summary>Jahreswerte {config.tax_year}</summary>
+      <summary>Year settings {config.tax_year}</summary>
       <form className="settings-grid" onSubmit={save}>
-        {number("gwg_limit_cents", "GWG-Grenze", true)}
-        {number("homeoffice_daily_cents", "Homeoffice je Tag", true)}
-        {number("homeoffice_max_days", "Homeoffice max. Tage")}
-        {number("distance_first_20_km_cents", "Entfernung km 1-20", true)}
-        {number("distance_after_20_km_cents", "Entfernung ab km 21", true)}
-        <button className="button button-ghost" type="submit">Werte speichern</button>
-        {message && <span className="settings-message">{message}</span>}
+        <label className="field compact-field">
+          <span>Immediate write-off threshold (GWG)</span>
+          <input
+            aria-describedby="gwg-explanation"
+            type="number"
+            min="0"
+            step="0.01"
+            value={(draft.gwg_limit_cents / 100).toFixed(2)}
+            onChange={(event) => setDraft((current) => ({
+              ...current,
+              gwg_limit_cents: Math.max(0, Math.round(Number(event.target.value) * 100)),
+            }))}
+          />
+          <small className="field-help" id="gwg-explanation">
+            GWG means the low-value asset immediate-write-off threshold. Amount in EUR.
+          </small>
+        </label>
+        <button className="button button-ghost" type="submit">Save settings</button>
+        {message && <span className="settings-message" role="status">{message}</span>}
       </form>
     </details>
   );
@@ -356,7 +339,7 @@ function App() {
       setConfigs(configResult.config);
       setReceipts(receiptResult.receipts);
     }).catch((reason) => {
-      setError(reason instanceof Error ? reason.message : "App konnte nicht geladen werden");
+      setError(reason instanceof Error ? reason.message : "Could not load the app");
     }).finally(() => setLoading(false));
   }, [currentYear]);
 
@@ -367,7 +350,7 @@ function App() {
     try {
       await loadReceipts(targetYear);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Belege konnten nicht geladen werden");
+      setError(reason instanceof Error ? reason.message : "Could not load receipts");
     } finally {
       setLoading(false);
     }
@@ -384,11 +367,11 @@ function App() {
         body: form,
       });
       const receipt = applySuggestions(result.receipt, result.suggestions);
-      if (result.receipt.tax_year !== year) setYear(result.receipt.tax_year);
-      await loadReceipts(result.receipt.tax_year);
+      if (receipt.tax_year !== year) setYear(receipt.tax_year);
+      await loadReceipts(receipt.tax_year);
       setSelected(receipt);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Upload fehlgeschlagen");
+      setError(reason instanceof Error ? reason.message : "Could not upload the receipt");
     } finally {
       setUploading(false);
       setDragging(false);
@@ -399,11 +382,12 @@ function App() {
     setError("");
     try {
       const result = await request<{ receipt: Receipt }>("/api/receipts/manual", { method: "POST" });
-      if (result.receipt.tax_year !== year) setYear(result.receipt.tax_year);
-      await loadReceipts(result.receipt.tax_year);
-      setSelected(result.receipt);
+      const receipt = result.receipt;
+      if (receipt.tax_year !== year) setYear(receipt.tax_year);
+      await loadReceipts(receipt.tax_year);
+      setSelected(receipt);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Eintrag konnte nicht erstellt werden");
+      setError(reason instanceof Error ? reason.message : "Could not create the entry");
     }
   };
 
@@ -419,14 +403,14 @@ function App() {
       setYear(result.tax_year);
       await loadReceipts(result.tax_year);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Import fehlgeschlagen");
+      setError(reason instanceof Error ? reason.message : "Could not import the backup");
     }
   };
 
   const createYearConfig = async () => {
     const source = configs.toSorted((a, b) => b.tax_year - a.tax_year)[0];
     if (!source) {
-      setError("Es gibt keine vorhandenen Jahreswerte als Ausgangspunkt.");
+      setError("There are no existing year settings to copy.");
       return;
     }
     setError("");
@@ -436,26 +420,22 @@ function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           gwg_limit_cents: source.gwg_limit_cents,
-          homeoffice_daily_cents: source.homeoffice_daily_cents,
-          homeoffice_max_days: source.homeoffice_max_days,
-          distance_first_20_km_cents: source.distance_first_20_km_cents,
-          distance_after_20_km_cents: source.distance_after_20_km_cents,
         }),
       });
       setConfigs((values) => [...values, result.config].toSorted((a, b) => b.tax_year - a.tax_year));
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Jahreswerte konnten nicht angelegt werden");
+      setError(reason instanceof Error ? reason.message : "Could not create year settings");
     }
   };
 
   const deleteReceipt = async (receipt: Receipt) => {
-    if (!window.confirm(`Beleg "${receipt.description}" unwiderruflich loeschen?`)) return;
+    if (!window.confirm(`Permanently delete receipt "${receipt.description}"?`)) return;
     try {
       await request<void>(`/api/receipts/${receipt.id}`, { method: "DELETE" });
       setSelected(null);
       await loadReceipts(year);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Loeschen fehlgeschlagen");
+      setError(reason instanceof Error ? reason.message : "Could not delete the receipt");
     }
   };
 
@@ -465,7 +445,7 @@ function App() {
       await loadReceipts(year);
       setSelected(result.receipt);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Duplizieren fehlgeschlagen");
+      setError(reason instanceof Error ? reason.message : "Could not duplicate the receipt");
     }
   };
 
@@ -475,10 +455,6 @@ function App() {
     if (file) void upload(file);
   };
 
-  const grouped = CATEGORIES.map((category) => ({
-    category,
-    items: receipts.filter((receipt) => receipt.category === category),
-  })).filter((group) => group.items.length);
   const total = receipts.reduce((sum, receipt) => sum + (receipt.gwg_flag ? 0 : receipt.deductible_cents), 0);
   const selectedConfig = configs.find((config) => config.tax_year === year);
 
@@ -489,7 +465,7 @@ function App() {
           <a className="brand" href="/">belegbox</a>
           <div className="nav-meta">
             <span className="auth-dot" aria-hidden="true" />
-            <span className="email">{email || "Authentifiziert"}</span>
+            <span className="email">{email || "Authenticated"}</span>
           </div>
         </div>
       </header>
@@ -497,21 +473,21 @@ function App() {
       <main className="app-main">
         <section className="toolbar">
           <div>
-            <span className="eyebrow">// WERBUNGSKOSTEN · ANLAGE N</span>
-            <h1>Belege und ELSTER-Summen</h1>
+            <span className="eyebrow">// WORK EQUIPMENT · OFFICIAL TAX RECORD</span>
+            <h1>Work equipment receipt ledger</h1>
           </div>
           <div className="toolbar-actions">
             <label className="year-select">
-              <span>Steuerjahr</span>
+              <span>Tax year</span>
               <select value={year} onChange={(event) => void chooseYear(Number(event.target.value))}>
                 {Array.from(new Set([year, currentYear, ...configs.map((config) => config.tax_year)]))
                   .sort((a, b) => b - a)
                   .map((value) => <option key={value}>{value}</option>)}
               </select>
             </label>
-            <button className="button button-ghost" type="button" onClick={() => void createManual()}>Manuell</button>
+            <button className="button button-ghost" type="button" onClick={() => void createManual()}>Add manually</button>
             <label className="button button-ghost file-button">
-              JSON importieren
+              Import JSON
               <input
                 type="file"
                 accept="application/json,.json"
@@ -523,7 +499,7 @@ function App() {
               />
             </label>
             <label className="button button-primary file-button">
-              {uploading ? "Laedt hoch..." : "Beleg hochladen"}
+              {uploading ? "Uploading..." : "Upload receipt"}
               <input
                 type="file"
                 accept="application/pdf,image/jpeg,image/png,image/webp,image/gif,image/avif,image/heic"
@@ -542,32 +518,34 @@ function App() {
 
         <section className="summary-grid">
           <article className="stat-card total-card">
-            <span>Abziehbare Gesamtsumme</span>
+            <span>Total deductible amount</span>
             <strong>{money(total)}</strong>
-            <small>{receipts.length} Belege · GWG/AfA-Prueffaelle ausgenommen</small>
+            <small>
+              {receipts.length} {receipts.length === 1 ? "receipt" : "receipts"} · Items requiring depreciation review excluded
+            </small>
           </article>
           <article className="stat-card">
-            <span>Vollstaendig</span>
+            <span>Complete</span>
             <strong>{receipts.filter((receipt) => receipt.status === "complete").length}</strong>
-            <small>{receipts.filter((receipt) => receipt.status === "draft").length} Entwuerfe offen</small>
+            <small>{receipts.filter((receipt) => receipt.status === "draft").length} drafts open</small>
           </article>
           <article className="stat-card warning-card">
-            <span>AfA pruefen</span>
+            <span>Depreciation review</span>
             <strong>{receipts.filter((receipt) => receipt.gwg_flag).length}</strong>
-            <small>Nicht in der Gesamtsumme enthalten</small>
+            <small>Excluded from the total deductible amount</small>
           </article>
           <article className="stat-card data-card">
-            <span>Export {year}</span>
+            <span>Exports {year}</span>
             <div className="export-links">
               {(["zip", "pdf", "csv", "json"] as const).map((format) => (
                 <a key={format} href={`/api/exports/${year}/${format}`}>{format.toUpperCase()}</a>
               ))}
             </div>
-            <small>Hand-off fuer ELSTER und Backup</small>
+            <small>For tax filing and backup</small>
           </article>
         </section>
 
-        <section
+        <label
           className={`drop-zone ${dragging ? "is-dragging" : ""}`}
           onDragEnter={(event) => { event.preventDefault(); setDragging(true); }}
           onDragOver={(event) => event.preventDefault()}
@@ -576,9 +554,20 @@ function App() {
           }}
           onDrop={onDrop}
         >
+          <input
+            className="drop-input"
+            type="file"
+            accept="application/pdf,image/jpeg,image/png,image/webp,image/gif,image/avif,image/heic"
+            disabled={uploading}
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (file) void upload(file);
+              event.target.value = "";
+            }}
+          />
           <span className="drop-mark">+</span>
-          <div><strong>PDF oder Bild hier ablegen</strong><small>Original bleibt privat in R2 · maximal 20 MB</small></div>
-        </section>
+          <div><strong>Drop a PDF or image here, or click to browse</strong><small>The original stays in private object storage · maximum 20 MB</small></div>
+        </label>
 
         {selectedConfig ? (
           <YearSettings
@@ -591,11 +580,11 @@ function App() {
         ) : (
           <section className="missing-config">
             <div>
-              <strong>Jahreswerte fuer {year} fehlen</strong>
-              <small>Werte des letzten Jahres uebernehmen und vor Verwendung pruefen.</small>
+              <strong>Year settings for {year} are missing</strong>
+              <small>Copy last year&apos;s immediate write-off threshold and review it before use.</small>
             </div>
             <button className="button button-ghost" type="button" onClick={() => void createYearConfig()}>
-              Jahr anlegen
+              Create year
             </button>
           </section>
         )}
@@ -603,61 +592,52 @@ function App() {
         <section className="ledger" aria-busy={loading}>
           <div className="ledger-head">
             <div>
-              <span className="eyebrow">// ELSTER-STRUKTUR</span>
-              <h2>Kategorien {year}</h2>
+              <span className="eyebrow">// OFFICIAL GERMAN TAX FORM FIELD · {year}</span>
+              <h2>{CATEGORY}</h2>
             </div>
-            <span className="tag">{grouped.length} Kategorien</span>
+            <div className="ledger-total">
+              <span>{receipts.length} {receipts.length === 1 ? "receipt" : "receipts"}</span>
+              <strong>{money(total)}</strong>
+            </div>
           </div>
 
           {!loading && !receipts.length && (
             <div className="empty-state">
-              <h3>Noch keine Belege fuer {year}</h3>
-              <p>Lade ein Original hoch oder lege eine Pauschale als manuellen Eintrag an.</p>
+              <h3>No receipts for {year}</h3>
+              <p>Upload an original or add a receipt manually.</p>
             </div>
           )}
 
-          {grouped.map((group) => {
-            const categoryTotal = group.items.reduce((sum, receipt) => sum + (receipt.gwg_flag ? 0 : receipt.deductible_cents), 0);
-            return (
-              <article className="category-block" key={group.category}>
-                <header className="category-head">
-                  <div>
-                    <h3>{group.category}</h3>
-                    <span>{group.items.length} {group.items.length === 1 ? "Beleg" : "Belege"}</span>
-                  </div>
-                  <div className="category-total"><span>Summe</span><strong>{money(categoryTotal)}</strong></div>
-                </header>
-                <div className="receipt-table" role="table">
-                  {group.items.map((receipt) => (
-                    <button className="receipt-row" type="button" role="row" key={receipt.id} onClick={() => setSelected(receipt)}>
-                      <span className="date-cell">{new Date(`${receipt.expense_date}T00:00:00`).toLocaleDateString("de-DE")}</span>
-                      <span className="description-cell">
-                        <strong>{receipt.description || "Ohne Beschreibung"}</strong>
-                        <small>{receipt.seller_name || receipt.original_filename || "Manueller Eintrag"}</small>
+          {!!receipts.length && (
+            <div className="receipt-table" role="table">
+              {receipts.map((receipt) => (
+                <button className="receipt-row" type="button" role="row" key={receipt.id} onClick={() => setSelected(receipt)}>
+                  <span className="date-cell">{new Date(`${receipt.expense_date}T00:00:00`).toLocaleDateString("en-GB")}</span>
+                  <span className="description-cell">
+                    <strong>{receipt.description || "No description"}</strong>
+                    <small>{receipt.seller_name || receipt.original_filename || "Manual entry"}</small>
+                  </span>
+                  <span className="status-cell">
+                    {receipt.gwg_flag ? <span className="tag tag-warning">Review depreciation</span> : (
+                      <span className={`tag ${receipt.status === "complete" ? "tag-complete" : ""}`}>
+                        {receipt.status === "complete" ? "Complete" : "Draft"}
                       </span>
-                      <span className="status-cell">
-                        {receipt.gwg_flag ? <span className="tag tag-warning">AfA pruefen</span> : (
-                          <span className={`tag ${receipt.status === "complete" ? "tag-complete" : ""}`}>
-                            {receipt.status === "complete" ? "Fertig" : "Entwurf"}
-                          </span>
-                        )}
-                      </span>
-                      <span className="amount-cell">
-                        <strong>{money(receipt.gwg_flag ? 0 : receipt.deductible_cents)}</strong>
-                        <small>von {money(receipt.amount_cents)}</small>
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </article>
-            );
-          })}
+                    )}
+                  </span>
+                  <span className="amount-cell">
+                    <strong>{money(receipt.gwg_flag ? 0 : receipt.deductible_cents)}</strong>
+                    <small>of {money(receipt.amount_cents)}</small>
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
         </section>
       </main>
 
       <footer className="app-footer">
-        <span>belegbox · private Belegablage</span>
-        <span>Keine ELSTER-API, keine automatisierte Abgabe, keine Steuerberatung.</span>
+        <span>belegbox · private receipt archive</span>
+        <span>No direct tax-filing integration, automated submission, or tax advice.</span>
       </footer>
 
       {selected && (

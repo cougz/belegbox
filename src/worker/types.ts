@@ -1,16 +1,5 @@
-export const CATEGORIES = [
-  "Arbeitsmittel",
-  "Fahrtkosten/Entfernungspauschale",
-  "Fortbildungskosten",
-  "Bewerbungskosten",
-  "Homeoffice-Pauschale",
-  "Kontoführungsgebühren",
-  "Gewerkschafts-/Berufsverbandsbeiträge",
-  "Reisekosten",
-  "Sonstiges",
-] as const;
-
-export type Category = (typeof CATEGORIES)[number];
+export const CATEGORY = "Aufwendungen für Arbeitsmittel" as const;
+export type Category = typeof CATEGORY;
 
 export interface Bindings {
   DB: D1Database;
@@ -23,13 +12,20 @@ export interface Bindings {
   DEV_AUTH_EMAIL?: string;
 }
 
-export interface AuthUser {
+export interface AuthIdentity {
   email: string;
   subject: string;
+  issuer: string;
+}
+
+export interface Owner {
+  id: string;
+  email: string;
 }
 
 export interface Variables {
-  user: AuthUser;
+  identity: AuthIdentity;
+  owner: Owner;
 }
 
 export type AppEnv = {
@@ -41,6 +37,7 @@ export interface ReceiptRow {
   id: string;
   created_at: string;
   updated_at: string;
+  owner_id: string;
   owner_email: string;
   status: "draft" | "complete";
   category: Category;
@@ -63,11 +60,8 @@ export interface ReceiptRow {
 }
 
 export interface TaxYearConfig {
+  owner_id: string;
   tax_year: number;
   gwg_limit_cents: number;
-  homeoffice_daily_cents: number;
-  homeoffice_max_days: number;
-  distance_first_20_km_cents: number;
-  distance_after_20_km_cents: number;
   updated_at: string;
 }

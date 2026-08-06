@@ -41,6 +41,7 @@ describe("Access JWT verification", () => {
     await expect(verify(await token({ aud: [audience] }))).resolves.toEqual({
       email: "owner@example.com",
       subject: "access-user",
+      issuer,
     });
   });
 
@@ -76,10 +77,10 @@ describe("Access middleware", () => {
       "*",
       accessMiddleware(async (value) => {
         if (value !== "valid") throw new Error("bad token");
-        return { email: "owner@example.com", subject: "owner" };
+        return { email: "owner@example.com", subject: "owner", issuer };
       }),
     );
-    app.get("/", (c) => c.json(c.get("user")));
+    app.get("/", (c) => c.json(c.get("identity")));
     const env = { ACCESS_TEAM_DOMAIN: teamDomain, ACCESS_AUD: audience };
 
     expect((await app.request("https://app.example/", {}, env)).status).toBe(401);
@@ -98,9 +99,9 @@ describe("Access middleware", () => {
     const app = new Hono<AppEnv>();
     app.use(
       "*",
-      accessMiddleware(async () => ({ email: "owner@example.com", subject: "owner" })),
+      accessMiddleware(async () => ({ email: "owner@example.com", subject: "owner", issuer })),
     );
-    app.get("/", (c) => c.json(c.get("user")));
+    app.get("/", (c) => c.json(c.get("identity")));
     const response = await app.request(
       "https://app.example/",
       { headers: { Cookie: "other=x; CF_Authorization=valid" } },

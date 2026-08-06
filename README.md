@@ -1,6 +1,6 @@
 # belegbox
 
-Single-user receipt manager for Werbungskosten in the German Anlage N workflow. The Worker is the source of truth for structured receipt data in D1 and private originals in R2. Exports are hand-off artifacts for manual entry and receipt upload in ELSTER; there is no ELSTER submission integration.
+Multi-user receipt manager for the `Aufwendungen für Arbeitsmittel` field in the German Anlage N workflow. The Worker is the source of truth for structured receipt data in D1 and private originals in R2. Exports are hand-off artifacts for manual entry and receipt upload in ELSTER; there is no ELSTER submission integration.
 
 Production: <https://belegbox.seiffert.me>
 
@@ -49,7 +49,8 @@ The global middleware:
 2. Fetches and caches `https://<team-name>.cloudflareaccess.com/cdn-cgi/access/certs`.
 3. Allows only RS256 and verifies the signature with `jose`.
 4. Requires exact issuer, an exact singleton audience containing only the configured tag, `exp`, `iat`, `nbf`, `email`, and `sub` claims.
-5. Uses the verified `email` claim as `owner_email` on every owner-scoped query.
+5. Maps the verified issuer and subject claims to a stable internal user UUID.
+6. Requires that UUID on every receipt, year-setting, file, and export query. Email is display metadata, not the authorization key.
 
 Any failure returns HTTP 401 before routing to APIs, R2, exports, or static assets.
 
@@ -104,7 +105,7 @@ Cloudflare Wrangler does not provide commands for creating Access applications o
 3. Set the application hostname to the exact deployed Worker hostname, covering every path.
 4. Set session duration to `24 hours`.
 5. Restrict the application to the selected GitHub/Google login method.
-6. Add one `Allow` policy with an `Emails` include rule containing only the owner's exact email address.
+6. Add an `Allow` policy for the SSO users or groups that should be able to sign in. The application creates a separate private workspace for each authenticated Access subject; there is currently no role-based access control or sharing.
 7. Do not add Bypass policies and do not enable preflight bypass.
 
 The hostname, owner email, OAuth credentials, and identity provider selection are operator-supplied values and are intentionally absent from source control.
@@ -159,14 +160,16 @@ There is intentionally no Workers Builds, Pages, GitHub Actions deployment, or g
 
 ## Data and exports
 
-Each receipt stores integer cents, a 0-100 professional-use percentage, and a generated deductible amount. Annual GWG, home-office, and distance values come from `tax_year_config`.
+Each receipt belongs to one internal UUID owner and stores integer cents, a 0-100 professional-use percentage, and a generated deductible amount. The only annual setting is the low-value asset immediate write-off threshold (`GWG`) in `tax_year_config`.
 
-An Arbeitsmittel amount above the configured GWG limit is marked `gwg_flag`. Its computed professional share remains visible, but the dashboard and all category/grand totals count it as zero and show an AfA warning. The app never silently treats it as an immediate full deduction.
+An amount above the configured immediate write-off threshold is marked `gwg_flag`. Its computed professional share remains visible, but the dashboard and exports count it as zero and show a clear depreciation warning. The app never silently treats it as an immediate full deduction.
+
+Access identities are keyed by exact issuer and subject claims in `users`. Receipt and annual-setting rows use `owner_id`; private R2 objects are stored below `receipts/<owner-uuid>/`. Email changes do not merge accounts, and one user cannot address another user's D1 rows or R2 keys through any API route.
 
 Authenticated export routes produce:
 
 - `belege-<year>.zip`: streamed original files with ELSTER-oriented names
-- `anlage-n-<year>.pdf`: printable itemized category summary
+- `anlage-n-<year>.pdf`: printable itemized work-equipment summary
 - `anlage-n-<year>.csv`: stable integer-cent backup rows
 - `anlage-n-<year>.json`: canonical backup that can be re-imported
 

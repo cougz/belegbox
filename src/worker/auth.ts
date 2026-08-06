@@ -5,7 +5,7 @@ import {
   type CryptoKey,
   type JWTVerifyGetKey,
 } from "jose";
-import type { AppEnv, AuthUser } from "./types";
+import type { AppEnv, AuthIdentity } from "./types";
 
 const jwksByIssuer = new Map<string, ReturnType<typeof createRemoteJWKSet>>();
 
@@ -38,7 +38,7 @@ export async function verifyAccessJwt(
   config: AccessConfig,
   key?: VerificationKey,
   now = new Date(),
-): Promise<AuthUser> {
+): Promise<AuthIdentity> {
   const issuer = issuerFor(config.teamDomain);
   const { payload } = await jwtVerify(token, key ?? remoteKeySet(issuer), {
     algorithms: ["RS256"],
@@ -64,7 +64,7 @@ export async function verifyAccessJwt(
     throw new Error("Invalid Access claims");
   }
 
-  return { email: payload.email, subject: payload.sub };
+  return { email: payload.email, subject: payload.sub, issuer };
 }
 
 export function accessToken(request: Request): string | null {
@@ -86,7 +86,7 @@ export function accessToken(request: Request): string | null {
   return null;
 }
 
-type Verifier = (token: string, config: AccessConfig) => Promise<AuthUser>;
+type Verifier = (token: string, config: AccessConfig) => Promise<AuthIdentity>;
 
 export function accessMiddleware(verifier: Verifier = verifyAccessJwt): MiddlewareHandler<AppEnv> {
   return async (c, next) => {
@@ -101,9 +101,10 @@ export function accessMiddleware(verifier: Verifier = verifyAccessJwt): Middlewa
       !audience;
 
     if (localDevelopment) {
-      c.set("user", {
+      c.set("identity", {
         email: env.DEV_AUTH_EMAIL?.trim() || "local@belegbox.invalid",
         subject: "local-development",
+        issuer: "local-development",
       });
       await next();
       return;
@@ -117,7 +118,7 @@ export function accessMiddleware(verifier: Verifier = verifyAccessJwt): Middlewa
     if (!token) return c.json({ error: "Unauthorized" }, 401);
 
     try {
-      c.set("user", await verifier(token, { teamDomain, audience }));
+      c.set("identity", await verifier(token, { teamDomain, audience }));
       await next();
     } catch {
       return c.json({ error: "Unauthorized" }, 401);
