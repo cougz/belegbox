@@ -2,6 +2,8 @@
 
 Single-user receipt manager for Werbungskosten in the German Anlage N workflow. The Worker is the source of truth for structured receipt data in D1 and private originals in R2. Exports are hand-off artifacts for manual entry and receipt upload in ELSTER; there is no ELSTER submission integration.
 
+Production: <https://belegbox.seiffert.me>
+
 ## Architecture
 
 - Cloudflare Worker with Hono routes and a Vite/React static asset build
@@ -148,7 +150,7 @@ There is intentionally no Workers Builds, Pages, GitHub Actions deployment, or g
 
 | Resource | Binding/name | Reproduction |
 | --- | --- | --- |
-| Worker | `belegbox` | `npm run build`, then `npx wrangler deploy --config dist/belegbox/wrangler.json --keep-vars` |
+| Worker | `belegbox` / `belegbox.seiffert.me` | `npm run build`, then `npx wrangler deploy --config dist/belegbox/wrangler.json --keep-vars` |
 | Static assets | `ASSETS` | Created with the Worker deployment |
 | D1 | `DB` / `belegbox` | `npx wrangler d1 create belegbox` |
 | R2 | `RECEIPTS` / `belegbox-belege` | `npx wrangler r2 bucket create belegbox-belege` |
