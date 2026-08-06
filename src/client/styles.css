@@ -132,6 +132,7 @@ h3 { font-weight: 500; }
 .notice { padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius-md); font-size: 13px; line-height: 1.45; }
 .notice-error { color: var(--danger); background: color-mix(in oklch, var(--danger) 7%, var(--canvas)); border-color: color-mix(in oklch, var(--danger) 22%, transparent); }
 .notice-warning { color: var(--warning); background: color-mix(in oklch, var(--warning) 7%, var(--canvas)); border-color: color-mix(in oklch, var(--warning) 22%, transparent); }
+.notice-ai { color: light-dark(#087A55, #70E2B8); background: color-mix(in oklch, var(--success) 8%, var(--canvas)); border-color: color-mix(in oklch, var(--success) 24%, transparent); }
 
 .editor-shell { position: fixed; inset: 0; z-index: 80; display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(440px, .9fr); background: var(--canvas); }
 .viewer-panel { min-height: 0; display: flex; flex-direction: column; padding: 22px; background: var(--recessed); border-right: 1px solid var(--line); }

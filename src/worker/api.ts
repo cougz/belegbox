@@ -1,9 +1,9 @@
 import { Hono } from "hono";
+import { extractReceiptSuggestions } from "./ocr";
 import { receiptObjectKey } from "./storage";
 import { CATEGORY, type AppEnv, type Category, type ReceiptRow, type TaxYearConfig } from "./types";
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
-const MAX_AI_FILE_SIZE = 5 * 1024 * 1024;
 
 interface ReceiptInput {
   status: "draft" | "complete";
@@ -117,56 +117,6 @@ function fileType(bytes: Uint8Array): string | null {
     if (["heic", "heix", "hevc", "mif1"].includes(brand)) return "image/heic";
   }
   return null;
-}
-
-function parseAiJson(response: unknown): Record<string, unknown> | null {
-  if (!response || typeof response !== "object") return null;
-  const raw = (response as { response?: unknown }).response;
-  if (typeof raw !== "string") return null;
-  try {
-    const parsed = JSON.parse(raw.replace(/^```(?:json)?\s*|\s*```$/g, ""));
-    return parsed && typeof parsed === "object" ? parsed as Record<string, unknown> : null;
-  } catch {
-    return null;
-  }
-}
-
-async function aiSuggestions(env: AppEnv["Bindings"], file: File, mimeType: string) {
-  if (
-    env.AI_PREFILL_ENABLED !== "true" ||
-    !mimeType.startsWith("image/") ||
-    mimeType === "image/heic" ||
-    file.size > MAX_AI_FILE_SIZE
-  ) {
-    return null;
-  }
-
-  try {
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    const result = await env.AI.run(
-      "@cf/meta/llama-3.2-11b-vision-instruct",
-      {
-        image: [...bytes],
-        prompt:
-          "Read this German receipt. Return JSON only with seller_name (string), " +
-          "expense_date (YYYY-MM-DD or empty), and amount_cents (integer euro cents or null).",
-        max_tokens: 180,
-      },
-    );
-    const parsed = parseAiJson(result);
-    if (!parsed) return null;
-    return {
-      seller_name: text(parsed.seller_name, 300) ?? "",
-      expense_date: typeof parsed.expense_date === "string" && isDate(parsed.expense_date)
-        ? parsed.expense_date
-        : "",
-      amount_cents: Number.isInteger(parsed.amount_cents) && (parsed.amount_cents as number) >= 0
-        ? parsed.amount_cents
-        : null,
-    };
-  } catch {
-    return null;
-  }
 }
 
 async function configFor(db: D1Database, ownerId: string, year: number): Promise<TaxYearConfig | null> {
@@ -329,12 +279,16 @@ api.post("/receipts/upload", async (c) => {
     throw error;
   }
 
-  const [receipt, suggestions] = await Promise.all([
+  const [receipt, aiPrefill] = await Promise.all([
     c.env.DB.prepare("SELECT * FROM receipts WHERE id = ? AND owner_id = ?")
       .bind(id, owner.id).first<ReceiptRow>(),
-    aiSuggestions(c.env, file, mimeType),
+    extractReceiptSuggestions(c.env, file, mimeType),
   ]);
-  return c.json({ receipt: receipt ? receiptForClient(receipt) : null, suggestions }, 201);
+  return c.json({
+    receipt: receipt ? receiptForClient(receipt) : null,
+    suggestions: aiPrefill.suggestions,
+    ai_prefill: { status: aiPrefill.status, model: aiPrefill.model },
+  }, 201);
 });
 
 api.post("/import/json", async (c) => {

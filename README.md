@@ -125,14 +125,9 @@ npx wrangler secret put ACCESS_AUD
 
 Enter the team domain as `https://<team-name>.cloudflareaccess.com` and the exact Application Audience tag. `keep_vars: true` preserves these remotely managed Worker values on later deploys.
 
-Optional AI pre-fill is disabled by default. Enable it as a Worker variable only after reviewing Workers AI data handling:
+AI text recognition is enabled in production through the Worker-only `AI_PREFILL_ENABLED` variable. PNG, JPEG, and WebP receipts are processed with the Workers AI Moondream 3.1 vision model. The model extracts editable seller, address, invoice number, date, gross total, payment method, and item-description suggestions.
 
-```sh
-npm run build
-npx wrangler deploy --config dist/belegbox/wrangler.json --var AI_PREFILL_ENABLED:true --keep-vars
-```
-
-AI suggestions are returned to the edit form but never written to D1 until the user explicitly saves the record. Unsupported files or AI errors fall back to manual entry.
+Suggestions are returned to the edit form but never written to D1 until the user explicitly saves the record. The UI reports disabled, unsupported, oversized, empty, and provider-error states instead of silently treating them as an empty result. Local development keeps AI disabled by default in `.dev.vars.example` to avoid accidental model calls.
 
 ### 6. Deploy
 

@@ -39,8 +39,18 @@ interface YearConfig {
 
 interface Suggestions {
   seller_name?: string;
+  seller_address?: string;
+  invoice_number?: string;
   expense_date?: string;
-  amount_cents?: number | null;
+  amount_cents?: number;
+  payment_method?: string;
+  description?: string;
+}
+
+interface AiPrefillInfo {
+  status: "ready" | "disabled" | "unsupported" | "too_large" | "no_fields" | "error";
+  model?: string;
+  fieldCount: number;
 }
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
@@ -62,9 +72,13 @@ function applySuggestions(receipt: Receipt, suggestions: Suggestions | null): Re
   return {
     ...receipt,
     seller_name: suggestions.seller_name || receipt.seller_name,
+    seller_address: suggestions.seller_address || receipt.seller_address,
+    invoice_number: suggestions.invoice_number || receipt.invoice_number,
     expense_date: expenseDate,
     tax_year: Number(expenseDate.slice(0, 4)),
     amount_cents: suggestions.amount_cents ?? receipt.amount_cents,
+    payment_method: suggestions.payment_method || receipt.payment_method,
+    description: suggestions.description || receipt.description,
   };
 }
 
@@ -74,12 +88,14 @@ function ReceiptEditor({
   onSaved,
   onDelete,
   onDuplicate,
+  aiPrefill,
 }: {
   receipt: Receipt;
   onClose: () => void;
   onSaved: (receipt: Receipt) => void;
   onDelete: (receipt: Receipt) => void;
   onDuplicate: (receipt: Receipt) => void;
+  aiPrefill: AiPrefillInfo | null;
 }) {
   const [draft, setDraft] = useState(receipt);
   const [saving, setSaving] = useState(false);
@@ -157,6 +173,21 @@ function ReceiptEditor({
         </div>
 
         {error && <p className="notice notice-error" role="alert">{error}</p>}
+        {aiPrefill?.status === "ready" && (
+          <p className="notice notice-ai" role="status">
+            AI text recognition (OCR) filled {aiPrefill.fieldCount} editable {aiPrefill.fieldCount === 1 ? "field" : "fields"}.
+            Review the values before saving; no suggestion has been committed yet.
+          </p>
+        )}
+        {aiPrefill && aiPrefill.status !== "ready" && (
+          <p className="notice notice-warning" role="status">
+            {aiPrefill.status === "no_fields" && "AI text recognition could not confidently identify receipt fields. Enter them manually."}
+            {aiPrefill.status === "unsupported" && "AI text recognition currently supports PNG, JPEG, and WebP images. Enter this file manually."}
+            {aiPrefill.status === "too_large" && "This image is too large for AI text recognition. Enter its fields manually."}
+            {aiPrefill.status === "error" && "AI text recognition failed. The original is stored safely; enter its fields manually."}
+            {aiPrefill.status === "disabled" && "AI text recognition is disabled. Enter the receipt fields manually."}
+          </p>
+        )}
         {draft.gwg_flag === 1 && (
           <p className="notice notice-warning">
             This amount exceeds the year&apos;s immediate write-off threshold. The receipt is excluded
@@ -323,6 +354,7 @@ function App() {
   const [uploading, setUploading] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [error, setError] = useState("");
+  const [aiPrefill, setAiPrefill] = useState<AiPrefillInfo | null>(null);
 
   const loadReceipts = async (targetYear: number) => {
     const result = await request<{ receipts: Receipt[] }>(`/api/receipts?tax_year=${targetYear}`);
@@ -362,11 +394,19 @@ function App() {
     try {
       const form = new FormData();
       form.set("file", file);
-      const result = await request<{ receipt: Receipt; suggestions: Suggestions | null }>("/api/receipts/upload", {
+      const result = await request<{
+        receipt: Receipt;
+        suggestions: Suggestions | null;
+        ai_prefill: Omit<AiPrefillInfo, "fieldCount">;
+      }>("/api/receipts/upload", {
         method: "POST",
         body: form,
       });
       const receipt = applySuggestions(result.receipt, result.suggestions);
+      setAiPrefill({
+        ...result.ai_prefill,
+        fieldCount: Object.keys(result.suggestions ?? {}).length,
+      });
       if (receipt.tax_year !== year) setYear(receipt.tax_year);
       await loadReceipts(receipt.tax_year);
       setSelected(receipt);
@@ -383,6 +423,7 @@ function App() {
     try {
       const result = await request<{ receipt: Receipt }>("/api/receipts/manual", { method: "POST" });
       const receipt = result.receipt;
+      setAiPrefill(null);
       if (receipt.tax_year !== year) setYear(receipt.tax_year);
       await loadReceipts(receipt.tax_year);
       setSelected(receipt);
@@ -443,6 +484,7 @@ function App() {
     try {
       const result = await request<{ receipt: Receipt }>(`/api/receipts/${receipt.id}/duplicate`, { method: "POST" });
       await loadReceipts(year);
+      setAiPrefill(null);
       setSelected(result.receipt);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not duplicate the receipt");
@@ -611,7 +653,16 @@ function App() {
           {!!receipts.length && (
             <div className="receipt-table" role="table">
               {receipts.map((receipt) => (
-                <button className="receipt-row" type="button" role="row" key={receipt.id} onClick={() => setSelected(receipt)}>
+                <button
+                  className="receipt-row"
+                  type="button"
+                  role="row"
+                  key={receipt.id}
+                  onClick={() => {
+                    setAiPrefill(null);
+                    setSelected(receipt);
+                  }}
+                >
                   <span className="date-cell">{new Date(`${receipt.expense_date}T00:00:00`).toLocaleDateString("en-GB")}</span>
                   <span className="description-cell">
                     <strong>{receipt.description || "No description"}</strong>
@@ -643,7 +694,11 @@ function App() {
       {selected && (
         <ReceiptEditor
           receipt={selected}
-          onClose={() => setSelected(null)}
+          aiPrefill={aiPrefill}
+          onClose={() => {
+            setAiPrefill(null);
+            setSelected(null);
+          }}
           onSaved={(saved) => {
             setSelected(saved);
             if (saved.tax_year !== year) {

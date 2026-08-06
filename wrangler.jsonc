@@ -34,5 +34,8 @@
   ],
   "ai": {
     "binding": "AI"
+  },
+  "vars": {
+    "AI_PREFILL_ENABLED": "true"
   }
 }
