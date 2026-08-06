@@ -1,0 +1,34 @@
+{
+  "name": "belegbox",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "deploy": "npm run build && wrangler deploy --config dist/belegbox/wrangler.json --keep-vars",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check": "npm run typecheck && npm run test && npm run build"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.51.0",
+    "@cloudflare/workers-types": "^5.20260804.1",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "@vitejs/plugin-react": "^6.0.5",
+    "typescript": "^7.0.2",
+    "vite": "^8.2.1",
+    "vitest": "^4.1.10",
+    "wrangler": "^4.119.0"
+  },
+  "dependencies": {
+    "fflate": "^0.8.3",
+    "hono": "^4.13.0",
+    "jose": "^6.2.8",
+    "pdf-lib": "^1.17.1",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  }
+}

@@ -1,0 +1,8 @@
+# Used only by Vite/Wrangler local development. Never set this in production.
+DEV_AUTH_EMAIL=local@belegbox.invalid
+
+# Leave both blank locally to enable the compile-time development auth bypass.
+ACCESS_TEAM_DOMAIN=
+ACCESS_AUD=
+
+AI_PREFILL_ENABLED=false
