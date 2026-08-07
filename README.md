@@ -131,16 +131,16 @@ Suggestions are returned to the edit form but never written to D1 until the user
 
 ### 6. Deploy
 
-Deployment is Wrangler-only:
+Production deploys run through Cloudflare Workers Builds on pushes to `main`:
 
 ```sh
-npm run build
+npm run check
 npx wrangler deploy --config dist/belegbox/wrangler.json --keep-vars
 ```
 
-The Vite plugin generates the deployable Worker configuration under `dist/belegbox`; deploying the source `wrangler.jsonc` directly does not point Wrangler at the built assets.
+The first command is the Workers Builds build command and the second is its deploy command. The Vite plugin generates the deployable Worker configuration under `dist/belegbox`; deploying the source `wrangler.jsonc` directly does not point Wrangler at the built assets. The same commands can be run locally for a manual deployment.
 
-There is intentionally no Workers Builds, Pages, GitHub Actions deployment, or git-triggered deployment configuration.
+There is no Pages or GitHub Actions deployment configuration.
 
 ## Resource inventory
 
