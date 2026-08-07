@@ -294,6 +294,185 @@ function ReceiptEditor({
   );
 }
 
+function ManualEntry({
+  year,
+  onClose,
+  onCreated,
+}: {
+  year: number;
+  onClose: () => void;
+  onCreated: (receipt: Receipt) => void;
+}) {
+  const today = new Date().toISOString().slice(0, 10);
+  const [draft, setDraft] = useState({
+    description: "",
+    amount: "",
+    expense_date: Number(today.slice(0, 4)) === year ? today : "",
+    seller_name: "",
+    business_use_pct: 100,
+    notes: "",
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !saving) onClose();
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [onClose, saving]);
+
+  const save = async (event: FormEvent) => {
+    event.preventDefault();
+    const amountCents = Math.round(Number(draft.amount) * 100);
+    if (!Number.isInteger(amountCents) || amountCents <= 0) {
+      setError("Enter an amount greater than zero.");
+      return;
+    }
+
+    setSaving(true);
+    setError("");
+    try {
+      const result = await request<{ receipt: Receipt }>("/api/receipts/manual", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          description: draft.description,
+          amount_cents: amountCents,
+          business_use_pct: draft.business_use_pct,
+          expense_date: draft.expense_date,
+          seller_name: draft.seller_name,
+          notes: draft.notes,
+        }),
+      });
+      onCreated(result.receipt);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not add the receipt");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div
+      className="manual-overlay"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget && !saving) onClose();
+      }}
+    >
+      <section className="manual-card" role="dialog" aria-modal="true" aria-labelledby="manual-title">
+        <div className="manual-head">
+          <div>
+            <span className="eyebrow">// QUICK ENTRY</span>
+            <h2 id="manual-title">Add a receipt</h2>
+            <p>Just the essentials. You can add invoice details later.</p>
+          </div>
+          <button className="icon-button" type="button" onClick={onClose} disabled={saving} aria-label="Close">×</button>
+        </div>
+
+        <form className="manual-form" onSubmit={save}>
+          {error && <p className="notice notice-error" role="alert">{error}</p>}
+          <div className="form-grid">
+            <label className="field span-2 manual-description">
+              <span>What did you buy?</span>
+              <input
+                autoFocus
+                required
+                maxLength={500}
+                value={draft.description}
+                onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))}
+                placeholder="e.g. Monitor arm"
+              />
+            </label>
+            <label className="field">
+              <span>How much?</span>
+              <div className="money-input">
+                <span aria-hidden="true">€</span>
+                <input
+                  required
+                  type="number"
+                  inputMode="decimal"
+                  min="0.01"
+                  max="9999999.99"
+                  step="0.01"
+                  value={draft.amount}
+                  onChange={(event) => setDraft((current) => ({ ...current, amount: event.target.value }))}
+                  placeholder="0.00"
+                  aria-label="Amount in euros"
+                />
+              </div>
+            </label>
+            <label className="field">
+              <span>When?</span>
+              <input
+                required
+                type="date"
+                value={draft.expense_date}
+                onChange={(event) => setDraft((current) => ({ ...current, expense_date: event.target.value }))}
+              />
+            </label>
+            <label className="field span-2">
+              <span>Where did you buy it? <em>Optional</em></span>
+              <input
+                maxLength={300}
+                value={draft.seller_name}
+                onChange={(event) => setDraft((current) => ({ ...current, seller_name: event.target.value }))}
+                placeholder="Shop or seller"
+              />
+            </label>
+          </div>
+
+          <details className="manual-more">
+            <summary>
+              <span>Work use and notes</span>
+              <small>{draft.business_use_pct}% work use</small>
+            </summary>
+            <div className="manual-more-fields">
+              <label className="field">
+                <span>Work use (%)</span>
+                <input
+                  required
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="1"
+                  value={draft.business_use_pct}
+                  onChange={(event) => setDraft((current) => ({
+                    ...current,
+                    business_use_pct: Number(event.target.value),
+                  }))}
+                />
+                <small className="field-help">Leave at 100% when the item is only used for work.</small>
+              </label>
+              <label className="field">
+                <span>Notes <em>Optional</em></span>
+                <textarea
+                  rows={3}
+                  maxLength={5000}
+                  value={draft.notes}
+                  onChange={(event) => setDraft((current) => ({ ...current, notes: event.target.value }))}
+                />
+              </label>
+            </div>
+          </details>
+
+          <div className="manual-actions">
+            <span>Filed under {CATEGORY}</span>
+            <div>
+              <button className="button button-ghost" type="button" onClick={onClose} disabled={saving}>Cancel</button>
+              <button className="button button-primary" type="submit" disabled={saving}>
+                {saving ? "Adding..." : "Add receipt"}
+              </button>
+            </div>
+          </div>
+        </form>
+      </section>
+    </div>
+  );
+}
+
 function YearSettings({ config, onSaved }: { config: YearConfig; onSaved: (config: YearConfig) => void }) {
   const [draft, setDraft] = useState(config);
   const [message, setMessage] = useState("");
@@ -355,6 +534,7 @@ function App() {
   const [dragging, setDragging] = useState(false);
   const [error, setError] = useState("");
   const [aiPrefill, setAiPrefill] = useState<AiPrefillInfo | null>(null);
+  const [manualOpen, setManualOpen] = useState(false);
 
   const loadReceipts = async (targetYear: number) => {
     const result = await request<{ receipts: Receipt[] }>(`/api/receipts?tax_year=${targetYear}`);
@@ -415,20 +595,6 @@ function App() {
     } finally {
       setUploading(false);
       setDragging(false);
-    }
-  };
-
-  const createManual = async () => {
-    setError("");
-    try {
-      const result = await request<{ receipt: Receipt }>("/api/receipts/manual", { method: "POST" });
-      const receipt = result.receipt;
-      setAiPrefill(null);
-      if (receipt.tax_year !== year) setYear(receipt.tax_year);
-      await loadReceipts(receipt.tax_year);
-      setSelected(receipt);
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Could not create the entry");
     }
   };
 
@@ -527,7 +693,7 @@ function App() {
                   .map((value) => <option key={value}>{value}</option>)}
               </select>
             </label>
-            <button className="button button-ghost" type="button" onClick={() => void createManual()}>Add manually</button>
+            <button className="button button-ghost" type="button" onClick={() => setManualOpen(true)}>Add manually</button>
             <label className="button button-ghost file-button">
               Import JSON
               <input
@@ -710,6 +876,25 @@ function App() {
           }}
           onDelete={(receipt) => void deleteReceipt(receipt)}
           onDuplicate={(receipt) => void duplicateReceipt(receipt)}
+        />
+      )}
+
+      {manualOpen && (
+        <ManualEntry
+          year={year}
+          onClose={() => setManualOpen(false)}
+          onCreated={(receipt) => {
+            setManualOpen(false);
+            setYear(receipt.tax_year);
+            if (receipt.tax_year === year) {
+              setReceipts((values) => [receipt, ...values]);
+            } else {
+              setReceipts([receipt]);
+            }
+            void loadReceipts(receipt.tax_year).catch((reason) => {
+              setError(reason instanceof Error ? reason.message : "Could not refresh receipts");
+            });
+          }}
         />
       )}
     </>

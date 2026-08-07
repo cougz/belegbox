@@ -20,6 +20,16 @@ interface ReceiptInput {
   notes: string;
 }
 
+interface ManualReceiptInput {
+  description: string;
+  amount_cents: number;
+  business_use_pct: number;
+  expense_date: string;
+  tax_year: number;
+  seller_name: string;
+  notes: string;
+}
+
 function receiptForClient(receipt: ReceiptRow & { effective_gwg_flag?: number }) {
   const {
     owner_id: _ownerId,
@@ -100,6 +110,39 @@ function parseReceiptInput(value: unknown): ReceiptInput | null {
     seller_address: sellerAddress,
     invoice_number: invoiceNumber,
     payment_method: paymentMethod,
+    notes,
+  };
+}
+
+function parseManualReceiptInput(value: unknown): ManualReceiptInput | null {
+  if (!value || typeof value !== "object") return null;
+  const input = value as Record<string, unknown>;
+  const description = text(input.description, 500);
+  const sellerName = text(input.seller_name, 300);
+  const notes = text(input.notes, 5000);
+  if (
+    !description ||
+    sellerName === null ||
+    notes === null ||
+    !Number.isInteger(input.amount_cents) ||
+    (input.amount_cents as number) <= 0 ||
+    (input.amount_cents as number) > 999_999_999 ||
+    !Number.isInteger(input.business_use_pct) ||
+    (input.business_use_pct as number) < 0 ||
+    (input.business_use_pct as number) > 100 ||
+    typeof input.expense_date !== "string" ||
+    !isDate(input.expense_date)
+  ) {
+    return null;
+  }
+
+  return {
+    description,
+    amount_cents: input.amount_cents as number,
+    business_use_pct: input.business_use_pct as number,
+    expense_date: input.expense_date,
+    tax_year: Number(input.expense_date.slice(0, 4)),
+    seller_name: sellerName,
     notes,
   };
 }
@@ -205,27 +248,40 @@ api.get("/receipts/:id", async (c) => {
 });
 
 api.post("/receipts/manual", async (c) => {
-  const draft = draftValues();
+  const input = parseManualReceiptInput(await c.req.json().catch(() => null));
+  if (!input) return jsonError(c, "Manual receipt data is invalid");
   const owner = c.get("owner");
-  if (!(await configFor(c.env.DB, owner.id, draft.tax_year))) {
-    return jsonError(c, "Year settings are missing for the current year", 422);
+  if (!(await configFor(c.env.DB, owner.id, input.tax_year))) {
+    return jsonError(c, "Year settings are missing for this tax year", 422);
   }
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
   await c.env.DB.prepare(
     `INSERT INTO receipts (
-      id, created_at, updated_at, owner_id, owner_email, category, description, expense_date, tax_year
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      id, created_at, updated_at, owner_id, owner_email, status, category, description, amount_cents,
+      business_use_pct, expense_date, tax_year, seller_name, notes, gwg_flag
+    ) VALUES (?, ?, ?, ?, ?, 'complete', ?, ?, ?, ?, ?, ?, ?, ?,
+      CASE WHEN ? > (
+        SELECT gwg_limit_cents FROM tax_year_config WHERE owner_id = ? AND tax_year = ?
+      ) THEN 1 ELSE 0 END
+    )`,
   ).bind(
     id,
     now,
     now,
     owner.id,
     owner.email,
-    draft.category,
-    draft.description,
-    draft.expense_date,
-    draft.tax_year,
+    CATEGORY,
+    input.description,
+    input.amount_cents,
+    input.business_use_pct,
+    input.expense_date,
+    input.tax_year,
+    input.seller_name,
+    input.notes,
+    input.amount_cents,
+    owner.id,
+    input.tax_year,
   ).run();
   const receipt = await c.env.DB.prepare("SELECT * FROM receipts WHERE id = ? AND owner_id = ?")
     .bind(id, owner.id).first<ReceiptRow>();

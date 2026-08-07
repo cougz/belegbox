@@ -165,6 +165,30 @@ h3 { font-weight: 500; }
 .editor-actions { display: flex; align-items: center; gap: 8px; margin-top: 20px; flex-wrap: wrap; }
 .owner-line { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); color: var(--text-subtle); font-family: var(--font-mono); font-size: 10px; }
 
+.manual-overlay { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; padding: 24px; background: color-mix(in oklch, #000 52%, transparent); backdrop-filter: blur(5px); }
+.manual-card { width: min(100%, 580px); max-height: calc(100vh - 48px); overflow: auto; border: 1px solid var(--line); border-radius: 22px; background: var(--canvas); box-shadow: 0 24px 80px rgba(0, 0, 0, .28); }
+.manual-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding: 24px 24px 18px; }
+.manual-head .eyebrow { margin-bottom: 7px; color: var(--accent); }
+.manual-head p { margin-top: 8px; color: var(--text-muted); font-size: 13px; }
+.manual-form { padding: 0 24px 24px; }
+.manual-form > .notice { margin-bottom: 16px; }
+.manual-description input { padding-block: 13px; font-size: 17px; }
+.field em { color: var(--text-subtle); font-family: var(--font-sans); font-size: 10px; font-style: normal; }
+.money-input { position: relative; }
+.money-input > span { position: absolute; top: 50%; left: 12px; z-index: 1; color: var(--text-muted); transform: translateY(-50%); }
+.money-input input { padding-left: 30px; }
+.manual-more { margin-top: 18px; border-block: 1px solid var(--line); }
+.manual-more summary { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 2px; cursor: pointer; font-size: 13px; font-weight: 500; list-style: none; }
+.manual-more summary::-webkit-details-marker { display: none; }
+.manual-more summary::before { content: "+"; width: 20px; height: 20px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 50%; background: var(--recessed); color: var(--accent); font-size: 16px; line-height: 1; }
+.manual-more[open] summary::before { content: "−"; }
+.manual-more summary span { margin-right: auto; }
+.manual-more summary small { color: var(--text-muted); font-family: var(--font-mono); font-size: 10px; font-weight: 400; }
+.manual-more-fields { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 14px; padding: 2px 2px 16px; }
+.manual-actions { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-top: 18px; }
+.manual-actions > span { max-width: 230px; color: var(--text-subtle); font-family: var(--font-mono); font-size: 9px; line-height: 1.4; }
+.manual-actions > div { display: flex; gap: 8px; flex: 0 0 auto; }
+
 .app-footer { max-width: 1480px; margin: 0 auto; padding: 24px; display: flex; justify-content: space-between; gap: 20px; border-top: 1px solid var(--line); color: var(--text-subtle); font-size: 11px; }
 
 @media (max-width: 980px) {
@@ -197,6 +221,14 @@ h3 { font-weight: 500; }
   .form-grid { grid-template-columns: 1fr; }
   .span-2 { grid-column: auto; }
   .settings-grid { grid-template-columns: 1fr; }
+  .manual-overlay { align-items: end; padding: 0; }
+  .manual-card { max-height: calc(100vh - 24px); border-radius: 22px 22px 0 0; border-bottom: 0; }
+  .manual-head { padding: 20px 16px 16px; }
+  .manual-form { padding: 0 16px 18px; }
+  .manual-more-fields { grid-template-columns: 1fr; }
+  .manual-actions { align-items: stretch; flex-direction: column; }
+  .manual-actions > span { max-width: none; }
+  .manual-actions > div { display: grid; grid-template-columns: 1fr 1fr; }
   .app-footer { flex-direction: column; padding-inline: 16px; }
 }
 
