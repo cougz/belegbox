@@ -1225,7 +1225,8 @@ function App() {
             setSelected(null);
           }}
           onSaved={(saved) => {
-            setSelected(saved);
+            setAiPrefill(null);
+            setSelected(null);
             return saveReceiptInLedger(saved);
           }}
           onDelete={deleteReceipt}
