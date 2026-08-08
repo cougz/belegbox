@@ -6,7 +6,7 @@ import type { AppEnv, Owner } from "./types";
 
 let miniflare: Miniflare;
 let db: D1Database;
-let receipts: R2Bucket;
+let receipts: Awaited<ReturnType<Miniflare["getR2Bucket"]>>;
 
 const owner: Owner = {
   id: "463aaecd-fdc7-455d-ab85-bb9a951c90a3",
