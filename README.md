@@ -7,7 +7,7 @@ Production: <https://belegbox.seiffert.me>
 ## Architecture
 
 - Cloudflare Worker with Hono routes and a Vite/React static asset build
-- D1 for receipt rows and annual tax configuration
+- D1 for receipt rows
 - Private R2 bucket for PDF/image originals
 - Workers AI for optional, non-persisted OCR suggestions
 - Cloudflare Access for OAuth authentication
@@ -50,7 +50,7 @@ The global middleware:
 3. Allows only RS256 and verifies the signature with `jose`.
 4. Requires exact issuer, an exact singleton audience containing only the configured tag, `exp`, `iat`, `nbf`, `email`, and `sub` claims.
 5. Maps the verified issuer and subject claims to a stable internal user UUID.
-6. Requires that UUID on every receipt, year-setting, file, and export query. Email is display metadata, not the authorization key.
+6. Requires that UUID on every receipt, file, and export query. Email is display metadata, not the authorization key.
 
 Any failure returns HTTP 401 before routing to APIs, R2, exports, or static assets.
 
