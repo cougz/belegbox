@@ -419,9 +419,13 @@ function ReceiptEditor({
   const [draft, setDraft] = useState(receipt);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [amountText, setAmountText] = useState(() => (receipt.amount_cents / 100).toFixed(2));
   const modalRef = useModalFocus(onClose, saving);
 
-  useEffect(() => setDraft(receipt), [receipt]);
+  useEffect(() => {
+    setDraft(receipt);
+    setAmountText((receipt.amount_cents / 100).toFixed(2));
+  }, [receipt]);
 
   const set = <K extends keyof Receipt>(key: K, value: Receipt[K]) => {
     setDraft((current) => ({ ...current, [key]: value }));
@@ -530,13 +534,19 @@ function ReceiptEditor({
                 <span>{copy.amountEur}</span>
                 <input
                   required
-                  type="number"
+                  type="text"
                   inputMode="decimal"
-                  min="0.01"
-                  max="9999999.99"
-                  step="0.01"
-                  value={(draft.amount_cents / 100).toFixed(2)}
-                  onChange={(event) => set("amount_cents", Math.max(0, Math.round(Number(event.target.value) * 100)))}
+                  pattern="^\d{1,7}([.,]\d{1,2})?$"
+                  value={amountText}
+                  onChange={(event) => {
+                    const raw = event.target.value;
+                    setAmountText(raw);
+                    const parsed = Number(raw.replace(",", "."));
+                    const valid = /^\d{1,7}([.,]\d{1,2})?$/.test(raw) && parsed >= 0.01 && parsed <= 9999999.99;
+                    event.target.setCustomValidity(valid ? "" : copy.receiptFieldsError);
+                    if (valid) set("amount_cents", Math.round(parsed * 100));
+                  }}
+                  onBlur={() => setAmountText((draft.amount_cents / 100).toFixed(2))}
                 />
               </label>
               <label className="field">
@@ -544,7 +554,7 @@ function ReceiptEditor({
                 <input
                   required
                   type="date"
-                  value={draft.expense_date}
+                  defaultValue={draft.expense_date}
                   onChange={(event) => {
                     setDraft((current) => ({
                       ...current,
@@ -869,6 +879,7 @@ function App() {
       const form = new FormData();
       form.set("file", item.file);
       form.set("receipt_id", item.id);
+      form.set("tax_year_hint", String(currentYearRef.current));
       const result = await request<{
         receipt: Receipt;
         suggestions: Suggestions | null;

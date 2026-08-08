@@ -303,12 +303,16 @@ api.post("/receipts/upload", async (c) => {
   if (requestedId !== null && (typeof requestedId !== "string" || !RECEIPT_ID.test(requestedId))) {
     return jsonError(c, "Receipt ID is invalid");
   }
+  const taxYearHintRaw = Number(form?.get("tax_year_hint"));
+  const taxYearHint = Number.isInteger(taxYearHintRaw) && taxYearHintRaw >= 2000 && taxYearHintRaw <= 2200
+    ? taxYearHintRaw
+    : undefined;
   const id = requestedId ?? crypto.randomUUID();
   const owner = c.get("owner");
   const existing = await c.env.DB.prepare("SELECT * FROM receipts WHERE id = ?").bind(id).first<ReceiptRow>();
   if (existing) {
     if (existing.owner_id !== owner.id) return jsonError(c, "Receipt ID is already in use", 409);
-    const aiPrefill = await extractReceiptSuggestions(c.env, file, mimeType);
+    const aiPrefill = await extractReceiptSuggestions(c.env, file, mimeType, taxYearHint);
     return c.json({
       receipt: receiptForClient(existing),
       suggestions: aiPrefill.suggestions,
@@ -361,7 +365,7 @@ api.post("/receipts/upload", async (c) => {
       ? Promise.resolve(receipt)
       : c.env.DB.prepare("SELECT * FROM receipts WHERE id = ? AND owner_id = ?")
         .bind(id, owner.id).first<ReceiptRow>(),
-    extractReceiptSuggestions(c.env, file, mimeType),
+    extractReceiptSuggestions(c.env, file, mimeType, taxYearHint),
   ]);
   return c.json({
     receipt: storedReceipt ? receiptForClient(storedReceipt) : null,

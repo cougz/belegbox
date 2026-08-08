@@ -124,6 +124,7 @@ export async function extractReceiptSuggestions(
   env: Bindings,
   file: File,
   mimeType: string,
+  taxYearHint?: number,
 ): Promise<AiPrefillResult> {
   if (env.AI_PREFILL_ENABLED !== "true") return { status: "disabled", suggestions: null };
   if (!SUPPORTED_TYPES.has(mimeType)) return { status: "unsupported", suggestions: null };
@@ -132,6 +133,11 @@ export async function extractReceiptSuggestions(
   try {
     const bytes = new Uint8Array(await file.arrayBuffer());
     const image = `data:${mimeType};base64,${toBase64(bytes)}`;
+    const yearHintText = taxYearHint
+      ? ` The user is currently filing receipts for German tax year ${taxYearHint}, so the purchase date's year is ` +
+        `most likely ${taxYearHint} or ${taxYearHint - 1} — use this only as a tie-breaker for a genuinely illegible ` +
+        "digit, and always prefer what is actually printed when it is legible."
+      : "";
     const result = await env.AI.run(MODEL, {
       task: "query",
       image,
@@ -142,9 +148,9 @@ export async function extractReceiptSuggestions(
         '"expense_date":null,"amount_cents":null,"payment_method":null,"description":null}. ' +
         "expense_date is the date the purchase was made, usually labeled 'Datum' near the transaction time — " +
         "not an expiry, warranty, or 'gültig bis' date. German receipts print dates as DD.MM.YYYY; read every digit " +
-        "carefully before converting, and format expense_date as YYYY-MM-DD. amount_cents must be the final gross " +
-        "total, usually labeled 'Summe', 'Gesamt', or 'zu zahlen', as an integer number of euro cents. " +
-        "description is the purchased work item, not a generic receipt label.",
+        "carefully before converting, and format expense_date as YYYY-MM-DD." + yearHintText + " amount_cents must " +
+        "be the final gross total, usually labeled 'Summe', 'Gesamt', or 'zu zahlen', as an integer number of euro " +
+        "cents. description is the purchased work item, not a generic receipt label.",
       reasoning: true,
       temperature: 0,
       max_tokens: 2048,
