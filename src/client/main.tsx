@@ -83,6 +83,12 @@ const EN = {
   dropHelp: "Choose one or many. OCR starts immediately, then you review each receipt in order · maximum 20 MB each",
   noReceiptsStart: "No receipts for",
   noReceiptsHelp: "Drop one or more receipts above to get started.",
+  noSearchResultsStart: "No receipts match",
+  noSearchResultsHelp: "Try a different description, order number, seller, or amount.",
+  searchPlaceholder: "Search description, order number, seller, amount…",
+  clearSearch: "Clear search",
+  orderNumber: "Order number",
+  noOrderNumber: "No order number",
   noDescription: "No description",
   manualEntry: "Manual entry",
   of: "of",
@@ -170,6 +176,12 @@ const TEXT: Record<Language, Copy> = {
     dropHelp: "Einen oder mehrere auswählen. OCR startet sofort, danach werden die Belege der Reihe nach geprüft · jeweils maximal 20 MB",
     noReceiptsStart: "Keine Belege für",
     noReceiptsHelp: "Zum Start einen oder mehrere Belege oben ablegen.",
+    noSearchResultsStart: "Keine Belege gefunden für",
+    noSearchResultsHelp: "Andere Beschreibung, Bestellnummer, Verkäufer oder Betrag versuchen.",
+    searchPlaceholder: "Beschreibung, Bestellnummer, Verkäufer, Betrag durchsuchen…",
+    clearSearch: "Suche leeren",
+    orderNumber: "Bestellnummer",
+    noOrderNumber: "Keine Bestellnummer",
     noDescription: "Keine Beschreibung",
     manualEntry: "Manueller Eintrag",
     of: "von",
@@ -672,6 +684,7 @@ function App() {
   const [year, setYear] = useState(() => initialTaxYear(currentYear));
   const startupYear = useRef(year).current;
   const [receipts, setReceipts] = useState<Receipt[]>([]);
+  const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Receipt | null>(null);
   const [loading, setLoading] = useState(true);
   const [dragging, setDragging] = useState(false);
@@ -744,6 +757,7 @@ function App() {
   const chooseYear = async (targetYear: number) => {
     currentYearRef.current = targetYear;
     setYear(targetYear);
+    setSearch("");
     setLoading(true);
     setError("");
     try {
@@ -889,6 +903,21 @@ function App() {
   };
 
   const total = receipts.reduce((sum, receipt) => sum + receipt.deductible_cents, 0);
+  const searchQuery = search.trim().toLowerCase();
+  const visibleReceipts = searchQuery
+    ? receipts.filter((receipt) => [
+      receipt.description,
+      receipt.seller_name,
+      receipt.invoice_number,
+      receipt.notes,
+      receipt.original_filename,
+      receipt.payment_method,
+      (receipt.amount_cents / 100).toFixed(2),
+      (receipt.deductible_cents / 100).toFixed(2),
+      receipt.expense_date,
+    ].some((field) => field?.toLowerCase().includes(searchQuery)))
+    : receipts;
+  const visibleTotal = visibleReceipts.reduce((sum, receipt) => sum + receipt.deductible_cents, 0);
   const currentQueueItem = receiptQueue[0];
 
   return (
@@ -978,9 +1007,23 @@ function App() {
               <span className="eyebrow">// {copy.officialFieldEyebrow.toUpperCase()} · {year}</span>
               <h2>{CATEGORY}</h2>
             </div>
+            {!!receipts.length && (
+              <div className="ledger-search">
+                <input
+                  type="search"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder={copy.searchPlaceholder}
+                  aria-label={copy.searchPlaceholder}
+                />
+                {search && (
+                  <button type="button" className="ledger-search-clear" onClick={() => setSearch("")} aria-label={copy.clearSearch}>×</button>
+                )}
+              </div>
+            )}
             <div className="ledger-total">
-              <span>{receipts.length} {receipts.length === 1 ? copy.receipt : copy.receipts}</span>
-              <strong>{money(total, language)}</strong>
+              <span>{visibleReceipts.length} {visibleReceipts.length === 1 ? copy.receipt : copy.receipts}</span>
+              <strong>{money(visibleTotal, language)}</strong>
             </div>
           </div>
 
@@ -991,9 +1034,16 @@ function App() {
             </div>
           )}
 
-          {!!receipts.length && (
+          {!!receipts.length && !visibleReceipts.length && (
+            <div className="empty-state">
+              <h3>{copy.noSearchResultsStart} "{search.trim()}"</h3>
+              <p>{copy.noSearchResultsHelp}</p>
+            </div>
+          )}
+
+          {!!visibleReceipts.length && (
             <div className="receipt-table" role="table">
-              {receipts.map((receipt) => (
+              {visibleReceipts.map((receipt) => (
                 <button
                   className="receipt-row"
                   type="button"
@@ -1008,6 +1058,9 @@ function App() {
                   <span className="description-cell">
                     <strong>{receipt.description || copy.noDescription}</strong>
                     <small>{receipt.seller_name || receipt.original_filename || copy.manualEntry}</small>
+                  </span>
+                  <span className="order-cell" title={receipt.invoice_number ? undefined : copy.noOrderNumber}>
+                    {receipt.invoice_number || "—"}
                   </span>
                   <span className="status-cell">
                     <span className={`tag ${receipt.status === "complete" ? "tag-complete" : ""}`}>

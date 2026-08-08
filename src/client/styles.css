@@ -107,19 +107,25 @@ h3 { font-weight: 500; }
 .ledger { overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--elevated); }
 .ledger-head { padding: 22px; display: flex; align-items: center; justify-content: space-between; gap: 24px; border-bottom: 1px solid var(--line); }
 .ledger-head .eyebrow { margin-bottom: 7px; }
+.ledger-search { position: relative; flex: 1 1 auto; max-width: 360px; }
+.ledger-search input { width: 100%; padding: 9px 34px 9px 14px; border: 1px solid var(--line); border-radius: var(--radius-pill); background: var(--elevated); color: var(--text); font-size: 13px; }
+.ledger-search input::-webkit-search-cancel-button { display: none; }
+.ledger-search-clear { position: absolute; top: 50%; right: 6px; width: 24px; height: 24px; display: grid; place-items: center; transform: translateY(-50%); border: 0; border-radius: 50%; background: transparent; color: var(--text-muted); cursor: pointer; font-size: 17px; line-height: 1; }
+.ledger-search-clear:hover { background: var(--recessed); }
 .ledger-total { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; flex: 0 0 auto; }
 .ledger-total span { color: var(--text-muted); font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; }
 .ledger-total strong { font-size: 20px; font-weight: 500; }
 .tag { display: inline-flex; align-items: center; width: fit-content; padding: 4px 9px; border: 1px solid var(--line); border-radius: var(--radius-pill); color: var(--text-muted); background: var(--recessed); font-family: var(--font-mono); font-size: 10px; white-space: nowrap; }
 .tag-complete { color: var(--success); border-color: color-mix(in oklch, var(--success) 30%, transparent); background: color-mix(in oklch, var(--success) 10%, transparent); }
 .receipt-table { display: flex; flex-direction: column; }
-.receipt-row { width: 100%; display: grid; grid-template-columns: 110px minmax(220px, 1fr) 110px 130px; align-items: center; gap: 16px; padding: 13px 22px; border: 0; border-top: 1px solid var(--line); background: var(--elevated); color: var(--text); text-align: left; cursor: pointer; }
+.receipt-row { width: 100%; display: grid; grid-template-columns: 110px minmax(220px, 1fr) 130px 110px 130px; align-items: center; gap: 16px; padding: 13px 22px; border: 0; border-top: 1px solid var(--line); background: var(--elevated); color: var(--text); text-align: left; cursor: pointer; }
 .receipt-row:first-child { border-top: 0; }
 .receipt-row:hover { background: color-mix(in oklch, var(--accent) 4%, var(--elevated)); }
 .date-cell { color: var(--text-muted); font-family: var(--font-mono); font-size: 11px; }
 .description-cell, .amount-cell { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .description-cell strong { overflow: hidden; font-size: 14px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
 .description-cell small, .amount-cell small { overflow: hidden; color: var(--text-muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.order-cell { overflow: hidden; color: var(--text-muted); font-family: var(--font-mono); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .status-cell { display: flex; justify-content: flex-start; }
 .amount-cell { text-align: right; }
 .amount-cell strong { font-size: 14px; font-weight: 500; }
@@ -211,9 +217,10 @@ h3 { font-weight: 500; }
   .toolbar-actions { width: 100%; justify-content: flex-start; }
   .summary-grid { grid-template-columns: 1fr; }
   .receipt-row { grid-template-columns: 82px minmax(0, 1fr) 100px; gap: 10px; padding-inline: 14px; }
-  .status-cell { display: none; }
+  .status-cell, .order-cell { display: none; }
   .ledger-head { align-items: flex-start; flex-direction: column; padding-inline: 14px; }
   .ledger-head h2 { overflow-wrap: anywhere; }
+  .ledger-search { width: 100%; max-width: none; }
   .ledger-total { width: 100%; flex-direction: row; align-items: baseline; justify-content: space-between; }
   .drop-zone { justify-content: flex-start; }
   .receipt-overlay { align-items: end; padding: 0; }
