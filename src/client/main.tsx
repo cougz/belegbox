@@ -287,6 +287,11 @@ function initialLanguage(): Language {
   return window.navigator.language.toLowerCase().startsWith("de") ? "de" : "en";
 }
 
+function initialTaxYear(fallback: number): number {
+  const saved = Number(window.localStorage.getItem("belegbox-tax-year"));
+  return Number.isInteger(saved) && saved >= 2000 && saved <= 2200 ? saved : fallback;
+}
+
 function useModalFocus(onClose: () => void, closeDisabled = false) {
   const modalRef = useRef<HTMLElement>(null);
   const close = useEffectEvent(() => {
@@ -727,7 +732,8 @@ function App() {
   const copy = TEXT[language];
   const [email, setEmail] = useState("");
   const [configs, setConfigs] = useState<YearConfig[]>([]);
-  const [year, setYear] = useState(currentYear);
+  const [year, setYear] = useState(() => initialTaxYear(currentYear));
+  const startupYear = useRef(year).current;
   const [receipts, setReceipts] = useState<Receipt[]>([]);
   const [selected, setSelected] = useState<Receipt | null>(null);
   const [loading, setLoading] = useState(true);
@@ -749,6 +755,7 @@ function App() {
 
   useEffect(() => {
     currentYearRef.current = year;
+    window.localStorage.setItem("belegbox-tax-year", String(year));
   }, [year]);
 
   useEffect(() => {
@@ -777,7 +784,7 @@ function App() {
     void Promise.all([
       request<{ email: string }>("/api/session"),
       request<{ config: YearConfig[] }>("/api/config"),
-      request<{ receipts: Receipt[] }>(`/api/receipts?tax_year=${currentYear}`),
+      request<{ receipts: Receipt[] }>(`/api/receipts?tax_year=${startupYear}`),
     ]).then(([session, configResult, receiptResult]) => {
       setEmail(session.email);
       setConfigs(configResult.config);
@@ -785,7 +792,7 @@ function App() {
     }).catch((reason) => {
       setError(reason instanceof Error ? reason.message : copy.loadAppError);
     }).finally(() => setLoading(false));
-  }, [currentYear]);
+  }, [startupYear]);
 
   const chooseYear = async (targetYear: number) => {
     setYear(targetYear);
