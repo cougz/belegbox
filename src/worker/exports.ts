@@ -61,8 +61,6 @@ async function buildPdf(bucket: R2Bucket, data: Awaited<ReturnType<typeof export
   line(`Total ${CATEGORY}: ${euro(data.total_cents)}`, 10, true);
   y -= 8;
   line(`Grand total: ${euro(data.total_cents)}`, 14, true);
-  y -= 8;
-  line("Handoff only; no automated submission to ELSTER, Germany's online tax portal, or tax advice.", 9, false, rgb(0.4, 0.4, 0.4));
 
   for (const receipt of data.receipts) {
     if (!receipt.r2_key) continue;
