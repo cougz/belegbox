@@ -4,6 +4,7 @@ import { receiptObjectKey } from "./storage";
 import { CATEGORY, type AppEnv, type Category, type ReceiptRow, type TaxYearConfig } from "./types";
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
+const RECEIPT_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 interface ReceiptInput {
   status: "draft" | "complete";
@@ -298,17 +299,34 @@ api.post("/receipts/upload", async (c) => {
   const mimeType = fileType(new Uint8Array(await file.slice(0, 16).arrayBuffer()));
   if (!mimeType) return jsonError(c, "Only PDF, JPEG, PNG, WebP, GIF, AVIF, and HEIC files are allowed", 415);
 
-  const draft = draftValues(file.name.slice(0, 500));
+  const requestedId = form?.get("receipt_id");
+  if (requestedId !== null && (typeof requestedId !== "string" || !RECEIPT_ID.test(requestedId))) {
+    return jsonError(c, "Receipt ID is invalid");
+  }
+  const id = requestedId ?? crypto.randomUUID();
   const owner = c.get("owner");
+  const existing = await c.env.DB.prepare("SELECT * FROM receipts WHERE id = ?").bind(id).first<ReceiptRow>();
+  if (existing) {
+    if (existing.owner_id !== owner.id) return jsonError(c, "Receipt ID is already in use", 409);
+    const aiPrefill = await extractReceiptSuggestions(c.env, file, mimeType);
+    return c.json({
+      receipt: receiptForClient(existing),
+      suggestions: aiPrefill.suggestions,
+      ai_prefill: { status: aiPrefill.status, model: aiPrefill.model },
+    });
+  }
+
+  const draft = draftValues(file.name.slice(0, 500));
   if (!(await configFor(c.env.DB, owner.id, draft.tax_year))) {
     return jsonError(c, "Year settings are missing for the current year", 422);
   }
-  const id = crypto.randomUUID();
   const now = new Date().toISOString();
-  const r2Key = receiptObjectKey(owner.id, id);
+  const r2Key = `${receiptObjectKey(owner.id, id)}/${crypto.randomUUID()}`;
   await c.env.RECEIPTS.put(r2Key, file.stream(), {
     httpMetadata: { contentType: mimeType },
   });
+  let receipt: ReceiptRow | null = null;
+  let created = true;
   try {
     await c.env.DB.prepare(
       `INSERT INTO receipts (
@@ -332,19 +350,24 @@ api.post("/receipts/upload", async (c) => {
     ).run();
   } catch (error) {
     await c.env.RECEIPTS.delete(r2Key);
-    throw error;
+    receipt = await c.env.DB.prepare("SELECT * FROM receipts WHERE id = ?").bind(id).first<ReceiptRow>();
+    if (!receipt) throw error;
+    if (receipt.owner_id !== owner.id) return jsonError(c, "Receipt ID is already in use", 409);
+    created = false;
   }
 
-  const [receipt, aiPrefill] = await Promise.all([
-    c.env.DB.prepare("SELECT * FROM receipts WHERE id = ? AND owner_id = ?")
-      .bind(id, owner.id).first<ReceiptRow>(),
+  const [storedReceipt, aiPrefill] = await Promise.all([
+    receipt
+      ? Promise.resolve(receipt)
+      : c.env.DB.prepare("SELECT * FROM receipts WHERE id = ? AND owner_id = ?")
+        .bind(id, owner.id).first<ReceiptRow>(),
     extractReceiptSuggestions(c.env, file, mimeType),
   ]);
   return c.json({
-    receipt: receipt ? receiptForClient(receipt) : null,
+    receipt: storedReceipt ? receiptForClient(storedReceipt) : null,
     suggestions: aiPrefill.suggestions,
     ai_prefill: { status: aiPrefill.status, model: aiPrefill.model },
-  }, 201);
+  }, created ? 201 : 200);
 });
 
 api.post("/import/json", async (c) => {

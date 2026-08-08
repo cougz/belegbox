@@ -1,10 +1,212 @@
-import { StrictMode, useEffect, useState, type DragEvent, type FormEvent } from "react";
+import { StrictMode, useEffect, useEffectEvent, useRef, useState, type DragEvent, type FormEvent } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
 
 const CATEGORY = "Aufwendungen für Arbeitsmittel" as const;
 
 type Category = typeof CATEGORY;
+type Language = "de" | "en";
+
+const EN = {
+  authenticated: "Authenticated",
+  language: "Language",
+  editReceipt: "Edit receipt",
+  original: "Original",
+  noFile: "No file",
+  close: "Close",
+  receiptPreview: "Receipt preview",
+  pdfReceiptPreview: "PDF receipt preview",
+  manualNoOriginal: "Manual entry without an original file",
+  officialFieldEyebrow: "Official German tax form field",
+  complete: "Complete",
+  draft: "Draft",
+  ocrReadyStart: "AI text recognition (OCR) filled",
+  editableField: "editable field",
+  editableFields: "editable fields",
+  ocrReadyEnd: "Review the values before saving; no suggestion has been committed yet.",
+  ocrNoFields: "AI text recognition could not confidently identify receipt fields. Enter them manually.",
+  ocrUnsupported: "AI text recognition currently supports PNG, JPEG, and WebP images. Enter this file manually.",
+  ocrTooLarge: "This image is too large for AI text recognition. Enter its fields manually.",
+  ocrError: "AI text recognition failed. The original is stored safely; enter its fields manually.",
+  ocrDisabled: "AI text recognition is disabled. Enter the receipt fields manually.",
+  depreciationWarning: "This purchase is above the year's depreciation threshold. It is excluded from the immediately deductible total and marked for separate review.",
+  description: "Description / type of work item",
+  amountEur: "Amount (EUR)",
+  workUsePct: "Work use (%)",
+  deductibleAmount: "Calculated deductible amount",
+  excludedReview: "Excluded from totals; review for depreciation",
+  includedLedger: "Included in the ledger total",
+  receiptDate: "Receipt date",
+  taxYear: "Tax year",
+  seller: "Seller / vendor",
+  sellerAddress: "Seller address",
+  invoiceNumber: "Invoice number",
+  paymentMethod: "Payment method",
+  paymentPlaceholder: "Card, bank transfer, cash",
+  notes: "Notes",
+  saving: "Saving...",
+  saveReceipt: "Save receipt",
+  reviewReceipt: "Review receipt",
+  reviewIntro: "Check the essentials, then continue straight to the next receipt.",
+  moreDetails: "Invoice details and notes",
+  completeReceipt: "Complete receipt",
+  completeAndNext: "Complete & next",
+  preparingReceipt: "Preparing your receipt",
+  preparingReceiptHelp: "The original is being stored and read with OCR. Review starts as soon as it is ready.",
+  retry: "Try again",
+  skip: "Skip file",
+  stopQueueConfirm: "Stop reviewing this batch? Uploaded receipts will remain saved as drafts.",
+  queueUploadError: "This file could not be prepared",
+  delete: "Delete",
+  saveReceiptError: "Could not save the receipt",
+  workUse: "work use",
+  workUseHelp: "Leave at 100% when the item is only used for work.",
+  filedUnder: "Filed under",
+  depreciationRule: "Depreciation rule",
+  thresholdStart: "Purchases over",
+  thresholdEnd: "are reviewed separately",
+  thresholdExplanation: "belegbox uses this amount as a sorting rule. Purchases above it are not added to the immediately deductible total and are marked for a separate depreciation review.",
+  thresholdLabel: "Separate review above (EUR)",
+  thresholdHelp: "Only change this if your tax setup requires a different limit. It does not change the amount stored on a receipt.",
+  saveRule: "Save rule",
+  ruleSaved: "Depreciation rule saved.",
+  ruleSaveError: "Could not save the depreciation rule",
+  loadAppError: "Could not load the app",
+  loadReceiptsError: "Could not load receipts",
+  noRuleToCopy: "There is no existing depreciation rule to copy.",
+  createRuleError: "Could not create the depreciation rule",
+  deleteConfirmStart: "Permanently delete receipt",
+  deleteError: "Could not delete the receipt",
+  refreshError: "Could not refresh receipts",
+  workEquipmentEyebrow: "Work equipment · official tax record",
+  ledgerTitle: "Work equipment receipt ledger",
+  totalDeductible: "Total deductible amount",
+  receipt: "receipt",
+  receipts: "receipts",
+  depreciationItemsExcluded: "Items requiring depreciation review excluded",
+  draftsOpen: "drafts open",
+  depreciationReview: "Depreciation review",
+  excludedFromTotal: "Excluded from the total deductible amount",
+  exports: "Exports",
+  exportHelp: "For tax filing and backup",
+  dropTitle: "Drop all receipt images or PDFs here",
+  dropHelp: "Choose one or many. OCR starts immediately, then you review each receipt in order · maximum 20 MB each",
+  ruleMissingStart: "Depreciation rule for",
+  ruleMissingEnd: "is missing",
+  ruleMissingHelp: "Copy the most recent threshold and review it before use.",
+  createYear: "Create year",
+  noReceiptsStart: "No receipts for",
+  noReceiptsHelp: "Drop one or more receipts above to get started.",
+  noDescription: "No description",
+  manualEntry: "Manual entry",
+  reviewDepreciation: "Review depreciation",
+  of: "of",
+  privateArchive: "private receipt archive",
+  githubLabel: "belegbox source code on GitHub",
+} as const;
+
+type Copy = { [Key in keyof typeof EN]: string };
+
+const TEXT: Record<Language, Copy> = {
+  en: EN,
+  de: {
+    authenticated: "Angemeldet",
+    language: "Sprache",
+    editReceipt: "Beleg bearbeiten",
+    original: "Original",
+    noFile: "Keine Datei",
+    close: "Schließen",
+    receiptPreview: "Belegvorschau",
+    pdfReceiptPreview: "PDF-Belegvorschau",
+    manualNoOriginal: "Manueller Eintrag ohne Originaldatei",
+    officialFieldEyebrow: "Feld der deutschen Steuererklärung",
+    complete: "Vollständig",
+    draft: "Entwurf",
+    ocrReadyStart: "Die KI-Texterkennung (OCR) hat",
+    editableField: "bearbeitbares Feld",
+    editableFields: "bearbeitbare Felder",
+    ocrReadyEnd: "Bitte vor dem Speichern prüfen; die Vorschläge wurden noch nicht übernommen.",
+    ocrNoFields: "Die KI-Texterkennung konnte keine Belegdaten sicher erkennen. Bitte manuell eingeben.",
+    ocrUnsupported: "Die KI-Texterkennung unterstützt derzeit PNG-, JPEG- und WebP-Bilder. Bitte diese Datei manuell erfassen.",
+    ocrTooLarge: "Dieses Bild ist zu groß für die KI-Texterkennung. Bitte die Daten manuell eingeben.",
+    ocrError: "Die KI-Texterkennung ist fehlgeschlagen. Das Original wurde sicher gespeichert; bitte die Daten manuell eingeben.",
+    ocrDisabled: "Die KI-Texterkennung ist deaktiviert. Bitte die Belegdaten manuell eingeben.",
+    depreciationWarning: "Diese Anschaffung liegt über der Abschreibungsgrenze. Sie wird nicht zur sofort abziehbaren Summe gezählt und muss separat geprüft werden.",
+    description: "Beschreibung / Art des Arbeitsmittels",
+    amountEur: "Betrag (EUR)",
+    workUsePct: "Berufliche Nutzung (%)",
+    deductibleAmount: "Berechneter abziehbarer Betrag",
+    excludedReview: "Nicht in der Summe; Abschreibung prüfen",
+    includedLedger: "In der Belegsumme enthalten",
+    receiptDate: "Belegdatum",
+    taxYear: "Steuerjahr",
+    seller: "Verkäufer / Anbieter",
+    sellerAddress: "Adresse des Verkäufers",
+    invoiceNumber: "Rechnungsnummer",
+    paymentMethod: "Zahlungsart",
+    paymentPlaceholder: "Karte, Überweisung, Barzahlung",
+    notes: "Notizen",
+    saving: "Wird gespeichert...",
+    saveReceipt: "Beleg speichern",
+    reviewReceipt: "Beleg prüfen",
+    reviewIntro: "Das Wesentliche prüfen und direkt mit dem nächsten Beleg weitermachen.",
+    moreDetails: "Rechnungsdetails und Notizen",
+    completeReceipt: "Beleg abschließen",
+    completeAndNext: "Abschließen & weiter",
+    preparingReceipt: "Beleg wird vorbereitet",
+    preparingReceiptHelp: "Das Original wird gespeichert und per OCR ausgelesen. Sobald es bereit ist, kann es geprüft werden.",
+    retry: "Erneut versuchen",
+    skip: "Datei überspringen",
+    stopQueueConfirm: "Stapelbearbeitung beenden? Bereits hochgeladene Belege bleiben als Entwürfe gespeichert.",
+    queueUploadError: "Diese Datei konnte nicht vorbereitet werden",
+    delete: "Löschen",
+    saveReceiptError: "Der Beleg konnte nicht gespeichert werden",
+    workUse: "beruflich genutzt",
+    workUseHelp: "Bei ausschließlich beruflicher Nutzung auf 100 % belassen.",
+    filedUnder: "Zugeordnet zu",
+    depreciationRule: "Abschreibungsgrenze",
+    thresholdStart: "Anschaffungen über",
+    thresholdEnd: "werden separat geprüft",
+    thresholdExplanation: "belegbox nutzt diesen Betrag als Sortierregel. Anschaffungen darüber werden nicht zur sofort abziehbaren Summe gezählt, sondern für eine separate Abschreibungsprüfung markiert.",
+    thresholdLabel: "Separate Prüfung über einem Betrag von (EUR)",
+    thresholdHelp: "Nur ändern, wenn für deine steuerliche Situation eine andere Grenze gilt. Die Beträge auf den Belegen werden dadurch nicht verändert.",
+    saveRule: "Regel speichern",
+    ruleSaved: "Abschreibungsgrenze gespeichert.",
+    ruleSaveError: "Die Abschreibungsgrenze konnte nicht gespeichert werden",
+    loadAppError: "Die Anwendung konnte nicht geladen werden",
+    loadReceiptsError: "Die Belege konnten nicht geladen werden",
+    noRuleToCopy: "Es gibt keine vorhandene Abschreibungsgrenze zum Kopieren.",
+    createRuleError: "Die Abschreibungsgrenze konnte nicht angelegt werden",
+    deleteConfirmStart: "Beleg endgültig löschen",
+    deleteError: "Der Beleg konnte nicht gelöscht werden",
+    refreshError: "Die Belege konnten nicht aktualisiert werden",
+    workEquipmentEyebrow: "Arbeitsmittel · offizieller Steuernachweis",
+    ledgerTitle: "Belegübersicht für Arbeitsmittel",
+    totalDeductible: "Gesamter abziehbarer Betrag",
+    receipt: "Beleg",
+    receipts: "Belege",
+    depreciationItemsExcluded: "Anschaffungen zur Abschreibungsprüfung ausgenommen",
+    draftsOpen: "offene Entwürfe",
+    depreciationReview: "Abschreibungsprüfung",
+    excludedFromTotal: "Nicht im gesamten abziehbaren Betrag enthalten",
+    exports: "Exporte",
+    exportHelp: "Für Steuererklärung und Sicherung",
+    dropTitle: "Alle Belegbilder oder PDFs hier ablegen",
+    dropHelp: "Einen oder mehrere auswählen. OCR startet sofort, danach werden die Belege der Reihe nach geprüft · jeweils maximal 20 MB",
+    ruleMissingStart: "Abschreibungsgrenze für",
+    ruleMissingEnd: "fehlt",
+    ruleMissingHelp: "Die zuletzt verwendete Grenze kopieren und vor der Nutzung prüfen.",
+    createYear: "Jahr anlegen",
+    noReceiptsStart: "Keine Belege für",
+    noReceiptsHelp: "Zum Start einen oder mehrere Belege oben ablegen.",
+    noDescription: "Keine Beschreibung",
+    manualEntry: "Manueller Eintrag",
+    reviewDepreciation: "Abschreibung prüfen",
+    of: "von",
+    privateArchive: "privates Belegarchiv",
+    githubLabel: "belegbox-Quellcode auf GitHub",
+  },
+};
 
 interface Receipt {
   id: string;
@@ -53,6 +255,16 @@ interface AiPrefillInfo {
   fieldCount: number;
 }
 
+interface ReceiptQueueItem {
+  id: string;
+  file: File;
+  position: number;
+  status: "uploading" | "ready" | "error";
+  receipt?: Receipt;
+  aiPrefill?: AiPrefillInfo;
+  error?: string;
+}
+
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const response = await fetch(url, options);
   if (!response.ok) {
@@ -62,8 +274,92 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
   return response.status === 204 ? undefined as T : response.json() as Promise<T>;
 }
 
-function money(cents: number): string {
-  return new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(cents / 100);
+function money(cents: number, language: Language): string {
+  return new Intl.NumberFormat(language === "de" ? "de-DE" : "en-IE", {
+    style: "currency",
+    currency: "EUR",
+  }).format(cents / 100);
+}
+
+function initialLanguage(): Language {
+  const saved = window.localStorage.getItem("belegbox-language");
+  if (saved === "de" || saved === "en") return saved;
+  return window.navigator.language.toLowerCase().startsWith("de") ? "de" : "en";
+}
+
+function useModalFocus(onClose: () => void, closeDisabled = false) {
+  const modalRef = useRef<HTMLElement>(null);
+  const close = useEffectEvent(() => {
+    if (!closeDisabled) onClose();
+  });
+
+  useEffect(() => {
+    const modal = modalRef.current;
+    if (!modal) return;
+
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const background = Array.from(document.getElementById("root")?.children ?? [])
+      .filter((element): element is HTMLElement => element instanceof HTMLElement && !element.contains(modal));
+    const backgroundState = background.map((element) => ({
+      element,
+      inert: element.inert,
+      ariaHidden: element.getAttribute("aria-hidden"),
+    }));
+    background.forEach((element) => {
+      element.inert = true;
+      element.setAttribute("aria-hidden", "true");
+    });
+
+    const focusableSelector = [
+      "button:not([disabled])",
+      "input:not([disabled])",
+      "select:not([disabled])",
+      "textarea:not([disabled])",
+      "summary",
+      "[href]",
+      "[tabindex]:not([tabindex='-1'])",
+    ].join(",");
+    const focusable = () => Array.from(modal.querySelectorAll<HTMLElement>(focusableSelector));
+    (modal.querySelector<HTMLElement>("[data-initial-focus]") ?? focusable()[0] ?? modal).focus();
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        close();
+        return;
+      }
+      if (event.key !== "Tab") return;
+
+      const elements = focusable();
+      if (!elements.length) {
+        event.preventDefault();
+        modal.focus();
+        return;
+      }
+      const first = elements[0];
+      const last = elements[elements.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      backgroundState.forEach(({ element, inert, ariaHidden }) => {
+        element.inert = inert;
+        if (ariaHidden === null) element.removeAttribute("aria-hidden");
+        else element.setAttribute("aria-hidden", ariaHidden);
+      });
+      if (previousFocus?.isConnected) previousFocus.focus();
+    };
+  }, []);
+
+  return modalRef;
 }
 
 function applySuggestions(receipt: Receipt, suggestions: Suggestions | null): Receipt {
@@ -84,28 +380,37 @@ function applySuggestions(receipt: Receipt, suggestions: Suggestions | null): Re
 
 function ReceiptEditor({
   receipt,
+  copy,
+  language,
   onClose,
   onSaved,
   onDelete,
-  onDuplicate,
   aiPrefill,
+  queueProgress,
+  configs,
 }: {
   receipt: Receipt;
+  copy: Copy;
+  language: Language;
   onClose: () => void;
   onSaved: (receipt: Receipt) => void;
   onDelete: (receipt: Receipt) => void;
-  onDuplicate: (receipt: Receipt) => void;
   aiPrefill: AiPrefillInfo | null;
+  queueProgress: { current: number; total: number } | null;
+  configs: YearConfig[];
 }) {
   const [draft, setDraft] = useState(receipt);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const modalRef = useModalFocus(onClose, saving);
 
   useEffect(() => setDraft(receipt), [receipt]);
 
   const set = <K extends keyof Receipt>(key: K, value: Receipt[K]) => {
     setDraft((current) => ({ ...current, [key]: value }));
   };
+  const gwgLimit = configs.find((config) => config.tax_year === draft.tax_year)?.gwg_limit_cents;
+  const requiresDepreciationReview = gwgLimit === undefined ? draft.gwg_flag === 1 : draft.amount_cents > gwgLimit;
 
   const save = async (event: FormEvent) => {
     event.preventDefault();
@@ -113,7 +418,7 @@ function ReceiptEditor({
     setError("");
     try {
       const body = {
-        status: draft.status,
+        status: "complete",
         category: CATEGORY,
         description: draft.description,
         amount_cents: draft.amount_cents,
@@ -134,262 +439,73 @@ function ReceiptEditor({
       setDraft(result.receipt);
       onSaved(result.receipt);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Could not save the receipt");
+      setError(reason instanceof Error ? reason.message : copy.saveReceiptError);
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <div className="editor-shell" role="dialog" aria-modal="true" aria-label="Edit receipt">
-      <section className={`viewer-panel ${draft.has_file ? "" : "no-file"}`}>
-        <div className="panel-head">
+    <div className="receipt-overlay" role="presentation">
+      <section ref={modalRef} className="receipt-card" role="dialog" aria-modal="true" aria-label={copy.editReceipt} tabIndex={-1}>
+        <header className="receipt-head">
           <div>
-            <span className="eyebrow">// ORIGINAL</span>
-            <h2>{draft.original_filename || "No file"}</h2>
+            <span className="eyebrow">// {copy.reviewReceipt.toUpperCase()}</span>
+            <h2>{copy.reviewReceipt}</h2>
+            <p>{copy.reviewIntro}</p>
           </div>
-          <button className="icon-button" type="button" onClick={onClose} aria-label="Close">×</button>
-        </div>
-        {draft.has_file ? (
-          draft.mime_type?.startsWith("image/") ? (
-            <img className="receipt-image" src={`/api/receipts/${draft.id}/file`} alt="Receipt preview" />
-          ) : (
-            <iframe className="receipt-pdf" src={`/api/receipts/${draft.id}/file`} title="PDF receipt preview" />
-          )
-        ) : (
-          <div className="empty-viewer">Manual entry without an original file</div>
-        )}
-      </section>
-
-      <form className="editor-form" onSubmit={save}>
-        <div className="panel-head sticky-head">
-          <div>
-            <span className="eyebrow">// OFFICIAL GERMAN TAX FORM FIELD</span>
-            <h2>Receipt details</h2>
+          <div className="receipt-head-actions">
+            {queueProgress && (
+              <span className="queue-count" aria-label={`${queueProgress.current} ${copy.of} ${queueProgress.total}`}>
+                {queueProgress.current} / {queueProgress.total}
+              </span>
+            )}
+            <button className="icon-button" type="button" onClick={onClose} disabled={saving} aria-label={copy.close}>×</button>
           </div>
-          <span className={`tag ${draft.status === "complete" ? "tag-complete" : ""}`}>
-            {draft.status === "complete" ? "Complete" : "Draft"}
-          </span>
-        </div>
+        </header>
 
-        {error && <p className="notice notice-error" role="alert">{error}</p>}
-        {aiPrefill?.status === "ready" && (
-          <p className="notice notice-ai" role="status">
-            AI text recognition (OCR) filled {aiPrefill.fieldCount} editable {aiPrefill.fieldCount === 1 ? "field" : "fields"}.
-            Review the values before saving; no suggestion has been committed yet.
-          </p>
-        )}
-        {aiPrefill && aiPrefill.status !== "ready" && (
-          <p className="notice notice-warning" role="status">
-            {aiPrefill.status === "no_fields" && "AI text recognition could not confidently identify receipt fields. Enter them manually."}
-            {aiPrefill.status === "unsupported" && "AI text recognition currently supports PNG, JPEG, and WebP images. Enter this file manually."}
-            {aiPrefill.status === "too_large" && "This image is too large for AI text recognition. Enter its fields manually."}
-            {aiPrefill.status === "error" && "AI text recognition failed. The original is stored safely; enter its fields manually."}
-            {aiPrefill.status === "disabled" && "AI text recognition is disabled. Enter the receipt fields manually."}
-          </p>
-        )}
-        {draft.gwg_flag === 1 && (
-          <p className="notice notice-warning">
-            This amount exceeds the year&apos;s immediate write-off threshold. The receipt is excluded
-            from the deductible total and must be reviewed separately for depreciation.
-          </p>
-        )}
+        <div className="receipt-workspace">
+          <section className={`receipt-viewer ${draft.has_file ? "" : "no-file"}`}>
+            <div className="receipt-filename">
+              <span>{copy.original}</span>
+              <strong>{draft.original_filename || copy.noFile}</strong>
+            </div>
+            {draft.has_file ? (
+              draft.mime_type?.startsWith("image/") ? (
+                <img className="receipt-image" src={`/api/receipts/${draft.id}/file`} alt={copy.receiptPreview} />
+              ) : (
+                <iframe className="receipt-pdf" src={`/api/receipts/${draft.id}/file`} title={copy.pdfReceiptPreview} />
+              )
+            ) : (
+              <div className="empty-viewer">{copy.manualNoOriginal}</div>
+            )}
+          </section>
 
-        <div className="form-grid">
-          <div className="official-field span-2">
-            <span>Official German tax form field</span>
-            <strong>{CATEGORY}</strong>
-          </div>
-          <label className="field span-2">
-            <span>Description / type of work item</span>
-            <input required maxLength={500} value={draft.description} onChange={(event) => set("description", event.target.value)} />
-          </label>
-          <label className="field">
-            <span>Amount (EUR)</span>
-            <input
-              required
-              type="number"
-              min="0"
-              max="9999999.99"
-              step="0.01"
-              value={(draft.amount_cents / 100).toFixed(2)}
-              onChange={(event) => set("amount_cents", Math.max(0, Math.round(Number(event.target.value) * 100)))}
-            />
-          </label>
-          <label className="field">
-            <span>Business use (%)</span>
-            <input
-              required
-              type="number"
-              min="0"
-              max="100"
-              step="1"
-              value={draft.business_use_pct}
-              onChange={(event) => set("business_use_pct", Number(event.target.value))}
-            />
-          </label>
-          <div className="calculated span-2">
-            <span>Calculated deductible amount</span>
-            <strong>{money(Math.round(draft.amount_cents * draft.business_use_pct / 100))}</strong>
-            <small>{draft.gwg_flag ? "Excluded from totals; review for depreciation" : "Included in the ledger total"}</small>
-          </div>
-          <label className="field">
-            <span>Receipt date</span>
-            <input
-              required
-              type="date"
-              value={draft.expense_date}
-              onChange={(event) => {
-                setDraft((current) => ({
-                  ...current,
-                  expense_date: event.target.value,
-                  tax_year: Number(event.target.value.slice(0, 4)),
-                }));
-              }}
-            />
-          </label>
-          <label className="field">
-            <span>Tax year</span>
-            <input readOnly value={draft.tax_year} />
-          </label>
-          <label className="field span-2">
-            <span>Seller / vendor</span>
-            <input maxLength={300} value={draft.seller_name} onChange={(event) => set("seller_name", event.target.value)} />
-          </label>
-          <label className="field span-2">
-            <span>Seller address</span>
-            <textarea rows={2} maxLength={1000} value={draft.seller_address} onChange={(event) => set("seller_address", event.target.value)} />
-          </label>
-          <label className="field">
-            <span>Invoice number</span>
-            <input maxLength={200} value={draft.invoice_number} onChange={(event) => set("invoice_number", event.target.value)} />
-          </label>
-          <label className="field">
-            <span>Payment method</span>
-            <input maxLength={100} value={draft.payment_method} onChange={(event) => set("payment_method", event.target.value)} placeholder="Card, bank transfer, cash" />
-          </label>
-          <label className="field span-2">
-            <span>Notes</span>
-            <textarea rows={4} maxLength={5000} value={draft.notes} onChange={(event) => set("notes", event.target.value)} />
-          </label>
-          <label className="field span-2">
-            <span>Status</span>
-            <select value={draft.status} onChange={(event) => set("status", event.target.value as Receipt["status"])}>
-              <option value="draft">Draft</option>
-              <option value="complete">Complete</option>
-            </select>
-          </label>
-        </div>
+          <form className="receipt-form" onSubmit={save}>
+            {error && <p className="notice notice-error" role="alert">{error}</p>}
+            {aiPrefill?.status === "ready" && (
+              <p className="notice notice-ai" role="status">
+                {copy.ocrReadyStart} {aiPrefill.fieldCount} {aiPrefill.fieldCount === 1 ? copy.editableField : copy.editableFields}. {copy.ocrReadyEnd}
+              </p>
+            )}
+            {aiPrefill && aiPrefill.status !== "ready" && (
+              <p className="notice notice-warning" role="status">
+                {aiPrefill.status === "no_fields" && copy.ocrNoFields}
+                {aiPrefill.status === "unsupported" && copy.ocrUnsupported}
+                {aiPrefill.status === "too_large" && copy.ocrTooLarge}
+                {aiPrefill.status === "error" && copy.ocrError}
+                {aiPrefill.status === "disabled" && copy.ocrDisabled}
+              </p>
+            )}
+            {requiresDepreciationReview && <p className="notice notice-warning">{copy.depreciationWarning}</p>}
 
-        <div className="editor-actions">
-          <button className="button button-primary" disabled={saving} type="submit">
-            {saving ? "Saving..." : "Save receipt"}
-          </button>
-          <button className="button button-ghost" type="button" onClick={() => onDuplicate(draft)}>Duplicate</button>
-          <button className="button button-danger" type="button" onClick={() => onDelete(draft)}>Delete</button>
-        </div>
-        <p className="owner-line">Record owner: {draft.owner_email}</p>
-      </form>
-    </div>
-  );
-}
-
-function ManualEntry({
-  year,
-  onClose,
-  onCreated,
-}: {
-  year: number;
-  onClose: () => void;
-  onCreated: (receipt: Receipt) => void;
-}) {
-  const today = new Date().toISOString().slice(0, 10);
-  const [draft, setDraft] = useState({
-    description: "",
-    amount: "",
-    expense_date: Number(today.slice(0, 4)) === year ? today : "",
-    seller_name: "",
-    business_use_pct: 100,
-    notes: "",
-  });
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !saving) onClose();
-    };
-    window.addEventListener("keydown", closeOnEscape);
-    return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [onClose, saving]);
-
-  const save = async (event: FormEvent) => {
-    event.preventDefault();
-    const amountCents = Math.round(Number(draft.amount) * 100);
-    if (!Number.isInteger(amountCents) || amountCents <= 0) {
-      setError("Enter an amount greater than zero.");
-      return;
-    }
-
-    setSaving(true);
-    setError("");
-    try {
-      const result = await request<{ receipt: Receipt }>("/api/receipts/manual", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          description: draft.description,
-          amount_cents: amountCents,
-          business_use_pct: draft.business_use_pct,
-          expense_date: draft.expense_date,
-          seller_name: draft.seller_name,
-          notes: draft.notes,
-        }),
-      });
-      onCreated(result.receipt);
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Could not add the receipt");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div
-      className="manual-overlay"
-      role="presentation"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget && !saving) onClose();
-      }}
-    >
-      <section className="manual-card" role="dialog" aria-modal="true" aria-labelledby="manual-title">
-        <div className="manual-head">
-          <div>
-            <span className="eyebrow">// QUICK ENTRY</span>
-            <h2 id="manual-title">Add a receipt</h2>
-            <p>Just the essentials. You can add invoice details later.</p>
-          </div>
-          <button className="icon-button" type="button" onClick={onClose} disabled={saving} aria-label="Close">×</button>
-        </div>
-
-        <form className="manual-form" onSubmit={save}>
-          {error && <p className="notice notice-error" role="alert">{error}</p>}
-          <div className="form-grid">
-            <label className="field span-2 manual-description">
-              <span>What did you buy?</span>
-              <input
-                autoFocus
-                required
-                maxLength={500}
-                value={draft.description}
-                onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))}
-                placeholder="e.g. Monitor arm"
-              />
-            </label>
-            <label className="field">
-              <span>How much?</span>
-              <div className="money-input">
-                <span aria-hidden="true">€</span>
+            <div className="form-grid">
+              <label className="field span-2 receipt-description">
+                <span>{copy.description}</span>
+                <input data-initial-focus required maxLength={500} value={draft.description} onChange={(event) => set("description", event.target.value)} />
+              </label>
+              <label className="field">
+                <span>{copy.amountEur}</span>
                 <input
                   required
                   type="number"
@@ -397,83 +513,160 @@ function ManualEntry({
                   min="0.01"
                   max="9999999.99"
                   step="0.01"
-                  value={draft.amount}
-                  onChange={(event) => setDraft((current) => ({ ...current, amount: event.target.value }))}
-                  placeholder="0.00"
-                  aria-label="Amount in euros"
+                  value={(draft.amount_cents / 100).toFixed(2)}
+                  onChange={(event) => set("amount_cents", Math.max(0, Math.round(Number(event.target.value) * 100)))}
                 />
-              </div>
-            </label>
-            <label className="field">
-              <span>When?</span>
-              <input
-                required
-                type="date"
-                value={draft.expense_date}
-                onChange={(event) => setDraft((current) => ({ ...current, expense_date: event.target.value }))}
-              />
-            </label>
-            <label className="field span-2">
-              <span>Where did you buy it? <em>Optional</em></span>
-              <input
-                maxLength={300}
-                value={draft.seller_name}
-                onChange={(event) => setDraft((current) => ({ ...current, seller_name: event.target.value }))}
-                placeholder="Shop or seller"
-              />
-            </label>
-          </div>
-
-          <details className="manual-more">
-            <summary>
-              <span>Work use and notes</span>
-              <small>{draft.business_use_pct}% work use</small>
-            </summary>
-            <div className="manual-more-fields">
+              </label>
               <label className="field">
-                <span>Work use (%)</span>
+                <span>{copy.receiptDate}</span>
                 <input
                   required
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="1"
-                  value={draft.business_use_pct}
-                  onChange={(event) => setDraft((current) => ({
-                    ...current,
-                    business_use_pct: Number(event.target.value),
-                  }))}
+                  type="date"
+                  value={draft.expense_date}
+                  onChange={(event) => {
+                    setDraft((current) => ({
+                      ...current,
+                      expense_date: event.target.value,
+                      tax_year: Number(event.target.value.slice(0, 4)),
+                    }));
+                  }}
                 />
-                <small className="field-help">Leave at 100% when the item is only used for work.</small>
               </label>
-              <label className="field">
-                <span>Notes <em>Optional</em></span>
-                <textarea
-                  rows={3}
-                  maxLength={5000}
-                  value={draft.notes}
-                  onChange={(event) => setDraft((current) => ({ ...current, notes: event.target.value }))}
-                />
+              <label className="field span-2">
+                <span>{copy.seller}</span>
+                <input maxLength={300} value={draft.seller_name} onChange={(event) => set("seller_name", event.target.value)} />
               </label>
             </div>
-          </details>
 
-          <div className="manual-actions">
-            <span>Filed under {CATEGORY}</span>
-            <div>
-              <button className="button button-ghost" type="button" onClick={onClose} disabled={saving}>Cancel</button>
-              <button className="button button-primary" type="submit" disabled={saving}>
-                {saving ? "Adding..." : "Add receipt"}
-              </button>
+            <details className="receipt-more">
+              <summary>
+                <span>{copy.moreDetails}</span>
+                <small>{draft.business_use_pct}% {copy.workUse}</small>
+              </summary>
+              <div className="form-grid receipt-more-fields">
+                <label className="field span-2">
+                  <span>{copy.sellerAddress}</span>
+                  <textarea rows={2} maxLength={1000} value={draft.seller_address} onChange={(event) => set("seller_address", event.target.value)} />
+                </label>
+                <label className="field">
+                  <span>{copy.invoiceNumber}</span>
+                  <input maxLength={200} value={draft.invoice_number} onChange={(event) => set("invoice_number", event.target.value)} />
+                </label>
+                <label className="field">
+                  <span>{copy.paymentMethod}</span>
+                  <input maxLength={100} value={draft.payment_method} onChange={(event) => set("payment_method", event.target.value)} placeholder={copy.paymentPlaceholder} />
+                </label>
+                <label className="field">
+                  <span>{copy.workUsePct}</span>
+                  <input
+                    required
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="1"
+                    value={draft.business_use_pct}
+                    onChange={(event) => set("business_use_pct", Number(event.target.value))}
+                  />
+                  <small className="field-help">{copy.workUseHelp}</small>
+                </label>
+                <label className="field">
+                  <span>{copy.notes}</span>
+                  <textarea rows={3} maxLength={5000} value={draft.notes} onChange={(event) => set("notes", event.target.value)} />
+                </label>
+              </div>
+            </details>
+
+            <div className="calculated">
+              <span>{copy.deductibleAmount}</span>
+              <strong>{money(Math.round(draft.amount_cents * draft.business_use_pct / 100), language)}</strong>
+              <small>{requiresDepreciationReview ? copy.excludedReview : copy.includedLedger}</small>
             </div>
-          </div>
-        </form>
+
+            <div className="receipt-actions">
+              <span>{copy.filedUnder} {CATEGORY}</span>
+              <div>
+                {!queueProgress && (
+                  <button className="button button-danger" type="button" onClick={() => onDelete(draft)}>{copy.delete}</button>
+                )}
+                <button className="button button-primary" disabled={saving} type="submit">
+                  {saving
+                    ? copy.saving
+                    : queueProgress && queueProgress.current < queueProgress.total
+                      ? copy.completeAndNext
+                      : draft.status === "complete"
+                        ? copy.saveReceipt
+                        : copy.completeReceipt}
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
       </section>
     </div>
   );
 }
 
-function YearSettings({ config, onSaved }: { config: YearConfig; onSaved: (config: YearConfig) => void }) {
+function ReceiptQueueStatus({
+  item,
+  total,
+  copy,
+  onClose,
+  onRetry,
+  onSkip,
+}: {
+  item: ReceiptQueueItem;
+  total: number;
+  copy: Copy;
+  onClose: () => void;
+  onRetry: () => void;
+  onSkip: () => void;
+}) {
+  const modalRef = useModalFocus(onClose);
+
+  return (
+    <div className="receipt-overlay" role="presentation">
+      <section ref={modalRef} className="queue-card" role="dialog" aria-modal="true" aria-label={copy.preparingReceipt} tabIndex={-1}>
+        <header className="receipt-head">
+          <div>
+            <span className="eyebrow">// {copy.reviewReceipt.toUpperCase()}</span>
+            <h2>{copy.preparingReceipt}</h2>
+          </div>
+          <div className="receipt-head-actions">
+            <span className="queue-count">{item.position} / {total}</span>
+            <button className="icon-button" type="button" onClick={onClose} aria-label={copy.close}>×</button>
+          </div>
+        </header>
+        <div className="queue-state">
+          {item.status === "uploading" ? <span className="queue-spinner" aria-hidden="true" /> : <span className="queue-error-mark" aria-hidden="true">!</span>}
+          <strong>{item.file.name}</strong>
+          {item.status === "uploading" ? (
+            <p>{copy.preparingReceiptHelp}</p>
+          ) : (
+            <p className="queue-error" role="alert">{item.error || copy.queueUploadError}</p>
+          )}
+          {item.status === "error" && (
+            <div className="queue-actions">
+              <button className="button button-ghost" type="button" onClick={onSkip}>{copy.skip}</button>
+              <button className="button button-primary" type="button" onClick={onRetry}>{copy.retry}</button>
+            </div>
+          )}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function YearSettings({
+  config,
+  copy,
+  language,
+  onSaved,
+}: {
+  config: YearConfig;
+  copy: Copy;
+  language: Language;
+  onSaved: (config: YearConfig) => void;
+}) {
   const [draft, setDraft] = useState(config);
   const [message, setMessage] = useState("");
   useEffect(() => setDraft(config), [config]);
@@ -488,18 +681,24 @@ function YearSettings({ config, onSaved }: { config: YearConfig; onSaved: (confi
         body: JSON.stringify(draft),
       });
       onSaved(result.config);
-      setMessage("Year settings saved.");
+      setMessage(copy.ruleSaved);
     } catch (reason) {
-      setMessage(reason instanceof Error ? reason.message : "Could not save year settings");
+      setMessage(reason instanceof Error ? reason.message : copy.ruleSaveError);
     }
   };
 
   return (
     <details className="settings-card">
-      <summary>Year settings {config.tax_year}</summary>
+      <summary>
+        <span className="settings-summary-copy">
+          <span>{copy.depreciationRule} · {config.tax_year}</span>
+          <strong>{copy.thresholdStart} {money(config.gwg_limit_cents, language)} {copy.thresholdEnd}</strong>
+        </span>
+      </summary>
       <form className="settings-grid" onSubmit={save}>
+        <p className="settings-explanation">{copy.thresholdExplanation}</p>
         <label className="field compact-field">
-          <span>Immediate write-off threshold (GWG)</span>
+          <span>{copy.thresholdLabel}</span>
           <input
             aria-describedby="gwg-explanation"
             type="number"
@@ -512,10 +711,10 @@ function YearSettings({ config, onSaved }: { config: YearConfig; onSaved: (confi
             }))}
           />
           <small className="field-help" id="gwg-explanation">
-            GWG means the low-value asset immediate-write-off threshold. Amount in EUR.
+            {copy.thresholdHelp}
           </small>
         </label>
-        <button className="button button-ghost" type="submit">Save settings</button>
+        <button className="button button-ghost" type="submit">{copy.saveRule}</button>
         {message && <span className="settings-message" role="status">{message}</span>}
       </form>
     </details>
@@ -524,17 +723,50 @@ function YearSettings({ config, onSaved }: { config: YearConfig; onSaved: (confi
 
 function App() {
   const currentYear = new Date().getFullYear();
+  const [language, setLanguage] = useState<Language>(initialLanguage);
+  const copy = TEXT[language];
   const [email, setEmail] = useState("");
   const [configs, setConfigs] = useState<YearConfig[]>([]);
   const [year, setYear] = useState(currentYear);
   const [receipts, setReceipts] = useState<Receipt[]>([]);
   const [selected, setSelected] = useState<Receipt | null>(null);
   const [loading, setLoading] = useState(true);
-  const [uploading, setUploading] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [error, setError] = useState("");
   const [aiPrefill, setAiPrefill] = useState<AiPrefillInfo | null>(null);
-  const [manualOpen, setManualOpen] = useState(false);
+  const [receiptQueue, setReceiptQueue] = useState<ReceiptQueueItem[]>([]);
+  const [queueTotal, setQueueTotal] = useState(0);
+  const pendingUploads = useRef<Set<Promise<void>>>(new Set());
+  const currentYearRef = useRef(year);
+  const receiptInputRef = useRef<HTMLInputElement>(null);
+  const queueReturnFocus = useRef<HTMLElement | null>(null);
+  const queueWasOpen = useRef(false);
+
+  useEffect(() => {
+    document.documentElement.lang = language;
+    window.localStorage.setItem("belegbox-language", language);
+  }, [language]);
+
+  useEffect(() => {
+    currentYearRef.current = year;
+  }, [year]);
+
+  useEffect(() => {
+    if (receiptQueue.length) {
+      queueWasOpen.current = true;
+      return;
+    }
+    if (!queueWasOpen.current) return;
+    queueWasOpen.current = false;
+    const frame = requestAnimationFrame(() => {
+      const target = queueReturnFocus.current;
+      (target?.isConnected && !(target instanceof HTMLInputElement && target.disabled)
+        ? target
+        : receiptInputRef.current)?.focus();
+      queueReturnFocus.current = null;
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [receiptQueue.length]);
 
   const loadReceipts = async (targetYear: number) => {
     const result = await request<{ receipts: Receipt[] }>(`/api/receipts?tax_year=${targetYear}`);
@@ -551,7 +783,7 @@ function App() {
       setConfigs(configResult.config);
       setReceipts(receiptResult.receipts);
     }).catch((reason) => {
-      setError(reason instanceof Error ? reason.message : "Could not load the app");
+      setError(reason instanceof Error ? reason.message : copy.loadAppError);
     }).finally(() => setLoading(false));
   }, [currentYear]);
 
@@ -562,18 +794,17 @@ function App() {
     try {
       await loadReceipts(targetYear);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Could not load receipts");
+      setError(reason instanceof Error ? reason.message : copy.loadReceiptsError);
     } finally {
       setLoading(false);
     }
   };
 
-  const upload = async (file: File) => {
-    setUploading(true);
-    setError("");
+  const uploadQueueItem = async (item: ReceiptQueueItem) => {
     try {
       const form = new FormData();
-      form.set("file", file);
+      form.set("file", item.file);
+      form.set("receipt_id", item.id);
       const result = await request<{
         receipt: Receipt;
         suggestions: Suggestions | null;
@@ -583,41 +814,91 @@ function App() {
         body: form,
       });
       const receipt = applySuggestions(result.receipt, result.suggestions);
-      setAiPrefill({
+      const itemAiPrefill = {
         ...result.ai_prefill,
         fieldCount: Object.keys(result.suggestions ?? {}).length,
-      });
-      if (receipt.tax_year !== year) setYear(receipt.tax_year);
-      await loadReceipts(receipt.tax_year);
-      setSelected(receipt);
+      };
+      setReceiptQueue((items) => items.map((queued) => queued.id === item.id ? {
+        ...queued,
+        status: "ready",
+        receipt,
+        aiPrefill: itemAiPrefill,
+        error: undefined,
+      } : queued));
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Could not upload the receipt");
-    } finally {
-      setUploading(false);
-      setDragging(false);
+      setReceiptQueue((items) => items.map((queued) => queued.id === item.id ? {
+        ...queued,
+        status: "error",
+        error: reason instanceof Error ? reason.message : copy.queueUploadError,
+      } : queued));
     }
   };
 
-  const importBackup = async (file: File) => {
+  const startQueueUpload = (item: ReceiptQueueItem) => {
+    const upload = uploadQueueItem(item);
+    pendingUploads.current.add(upload);
+    void upload.finally(() => pendingUploads.current.delete(upload));
+  };
+
+  const enqueueReceipts = (files: FileList | File[]) => {
+    const selectedFiles = Array.from(files);
+    if (!selectedFiles.length) return;
+
+    const items: ReceiptQueueItem[] = selectedFiles.map((file, index) => ({
+      id: crypto.randomUUID(),
+      file,
+      position: index + 1,
+      status: "uploading",
+    }));
+
     setError("");
-    try {
-      const backup = JSON.parse(await file.text()) as { tax_year?: number };
-      const result = await request<{ imported: number; tax_year: number }>("/api/import/json", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(backup),
+    setDragging(false);
+    queueReturnFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setSelected(null);
+    setAiPrefill(null);
+    setQueueTotal(items.length);
+    setReceiptQueue(items);
+    items.forEach(startQueueUpload);
+  };
+
+  const closeReceiptQueue = () => {
+    if (!window.confirm(copy.stopQueueConfirm)) return;
+    const uploads = Array.from(pendingUploads.current);
+    const closedYear = year;
+    setReceiptQueue([]);
+    setQueueTotal(0);
+    void Promise.allSettled(uploads).then(() => {
+      if (currentYearRef.current !== closedYear) return;
+      return loadReceipts(closedYear).catch((reason) => {
+        setError(reason instanceof Error ? reason.message : copy.refreshError);
       });
-      setYear(result.tax_year);
-      await loadReceipts(result.tax_year);
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Could not import the backup");
+    });
+  };
+
+  const retryQueueItem = (item: ReceiptQueueItem) => {
+    const retry = { ...item, status: "uploading" as const, error: undefined };
+    setReceiptQueue((items) => items.map((queued) => queued.id === item.id ? retry : queued));
+    startQueueUpload(retry);
+  };
+
+  const saveReceiptInLedger = (saved: Receipt) => {
+    if (saved.tax_year !== year) {
+      setYear(saved.tax_year);
+      void loadReceipts(saved.tax_year).catch((reason) => {
+        setError(reason instanceof Error ? reason.message : copy.refreshError);
+      });
+      return;
     }
+
+    setReceipts((values) => values.some((value) => value.id === saved.id)
+      ? values.map((value) => value.id === saved.id ? saved : value)
+      : [saved, ...values]);
   };
 
   const createYearConfig = async () => {
     const source = configs.toSorted((a, b) => b.tax_year - a.tax_year)[0];
     if (!source) {
-      setError("There are no existing year settings to copy.");
+      setError(copy.noRuleToCopy);
       return;
     }
     setError("");
@@ -631,40 +912,29 @@ function App() {
       });
       setConfigs((values) => [...values, result.config].toSorted((a, b) => b.tax_year - a.tax_year));
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Could not create year settings");
+      setError(reason instanceof Error ? reason.message : copy.createRuleError);
     }
   };
 
   const deleteReceipt = async (receipt: Receipt) => {
-    if (!window.confirm(`Permanently delete receipt "${receipt.description}"?`)) return;
+    if (!window.confirm(`${copy.deleteConfirmStart} "${receipt.description}"?`)) return;
     try {
       await request<void>(`/api/receipts/${receipt.id}`, { method: "DELETE" });
       setSelected(null);
       await loadReceipts(year);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Could not delete the receipt");
-    }
-  };
-
-  const duplicateReceipt = async (receipt: Receipt) => {
-    try {
-      const result = await request<{ receipt: Receipt }>(`/api/receipts/${receipt.id}/duplicate`, { method: "POST" });
-      await loadReceipts(year);
-      setAiPrefill(null);
-      setSelected(result.receipt);
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Could not duplicate the receipt");
+      setError(reason instanceof Error ? reason.message : copy.deleteError);
     }
   };
 
   const onDrop = (event: DragEvent) => {
     event.preventDefault();
-    const file = event.dataTransfer.files[0];
-    if (file) void upload(file);
+    enqueueReceipts(event.dataTransfer.files);
   };
 
   const total = receipts.reduce((sum, receipt) => sum + (receipt.gwg_flag ? 0 : receipt.deductible_cents), 0);
   const selectedConfig = configs.find((config) => config.tax_year === year);
+  const currentQueueItem = receiptQueue[0];
 
   return (
     <>
@@ -673,7 +943,11 @@ function App() {
           <a className="brand" href="/">belegbox</a>
           <div className="nav-meta">
             <span className="auth-dot" aria-hidden="true" />
-            <span className="email">{email || "Authenticated"}</span>
+            <span className="email">{email || copy.authenticated}</span>
+            <div className="language-toggle" data-language={language} role="group" aria-label={copy.language}>
+              <button type="button" aria-pressed={language === "de"} onClick={() => setLanguage("de")}>DE</button>
+              <button type="button" aria-pressed={language === "en"} onClick={() => setLanguage("en")}>EN</button>
+            </div>
           </div>
         </div>
       </header>
@@ -681,43 +955,17 @@ function App() {
       <main className="app-main">
         <section className="toolbar">
           <div>
-            <span className="eyebrow">// WORK EQUIPMENT · OFFICIAL TAX RECORD</span>
-            <h1>Work equipment receipt ledger</h1>
+            <span className="eyebrow">// {copy.workEquipmentEyebrow.toUpperCase()}</span>
+            <h1>{copy.ledgerTitle}</h1>
           </div>
           <div className="toolbar-actions">
             <label className="year-select">
-              <span>Tax year</span>
+              <span>{copy.taxYear}</span>
               <select value={year} onChange={(event) => void chooseYear(Number(event.target.value))}>
                 {Array.from(new Set([year, currentYear, ...configs.map((config) => config.tax_year)]))
                   .sort((a, b) => b - a)
                   .map((value) => <option key={value}>{value}</option>)}
               </select>
-            </label>
-            <button className="button button-ghost" type="button" onClick={() => setManualOpen(true)}>Add manually</button>
-            <label className="button button-ghost file-button">
-              Import JSON
-              <input
-                type="file"
-                accept="application/json,.json"
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  if (file) void importBackup(file);
-                  event.target.value = "";
-                }}
-              />
-            </label>
-            <label className="button button-primary file-button">
-              {uploading ? "Uploading..." : "Upload receipt"}
-              <input
-                type="file"
-                accept="application/pdf,image/jpeg,image/png,image/webp,image/gif,image/avif,image/heic"
-                disabled={uploading}
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  if (file) void upload(file);
-                  event.target.value = "";
-                }}
-              />
             </label>
           </div>
         </section>
@@ -726,30 +974,30 @@ function App() {
 
         <section className="summary-grid">
           <article className="stat-card total-card">
-            <span>Total deductible amount</span>
-            <strong>{money(total)}</strong>
+            <span>{copy.totalDeductible}</span>
+            <strong>{money(total, language)}</strong>
             <small>
-              {receipts.length} {receipts.length === 1 ? "receipt" : "receipts"} · Items requiring depreciation review excluded
+              {receipts.length} {receipts.length === 1 ? copy.receipt : copy.receipts} · {copy.depreciationItemsExcluded}
             </small>
           </article>
           <article className="stat-card">
-            <span>Complete</span>
+            <span>{copy.complete}</span>
             <strong>{receipts.filter((receipt) => receipt.status === "complete").length}</strong>
-            <small>{receipts.filter((receipt) => receipt.status === "draft").length} drafts open</small>
+            <small>{receipts.filter((receipt) => receipt.status === "draft").length} {copy.draftsOpen}</small>
           </article>
           <article className="stat-card warning-card">
-            <span>Depreciation review</span>
+            <span>{copy.depreciationReview}</span>
             <strong>{receipts.filter((receipt) => receipt.gwg_flag).length}</strong>
-            <small>Excluded from the total deductible amount</small>
+            <small>{copy.excludedFromTotal}</small>
           </article>
           <article className="stat-card data-card">
-            <span>Exports {year}</span>
+            <span>{copy.exports} {year}</span>
             <div className="export-links">
               {(["zip", "pdf", "csv", "json"] as const).map((format) => (
                 <a key={format} href={`/api/exports/${year}/${format}`}>{format.toUpperCase()}</a>
               ))}
             </div>
-            <small>For tax filing and backup</small>
+            <small>{copy.exportHelp}</small>
           </article>
         </section>
 
@@ -763,23 +1011,26 @@ function App() {
           onDrop={onDrop}
         >
           <input
+            ref={receiptInputRef}
             className="drop-input"
             type="file"
             accept="application/pdf,image/jpeg,image/png,image/webp,image/gif,image/avif,image/heic"
-            disabled={uploading}
+            multiple
+            disabled={receiptQueue.length > 0}
             onChange={(event) => {
-              const file = event.target.files?.[0];
-              if (file) void upload(file);
+              if (event.target.files) enqueueReceipts(event.target.files);
               event.target.value = "";
             }}
           />
           <span className="drop-mark">+</span>
-          <div><strong>Drop a PDF or image here, or click to browse</strong><small>The original stays in private object storage · maximum 20 MB</small></div>
+          <div><strong>{copy.dropTitle}</strong><small>{copy.dropHelp}</small></div>
         </label>
 
         {selectedConfig ? (
           <YearSettings
             config={selectedConfig}
+            copy={copy}
+            language={language}
             onSaved={(updated) => {
               setConfigs((values) => values.map((value) => value.tax_year === updated.tax_year ? updated : value));
               void loadReceipts(year);
@@ -788,11 +1039,11 @@ function App() {
         ) : (
           <section className="missing-config">
             <div>
-              <strong>Year settings for {year} are missing</strong>
-              <small>Copy last year&apos;s immediate write-off threshold and review it before use.</small>
+              <strong>{copy.ruleMissingStart} {year} {copy.ruleMissingEnd}</strong>
+              <small>{copy.ruleMissingHelp}</small>
             </div>
             <button className="button button-ghost" type="button" onClick={() => void createYearConfig()}>
-              Create year
+              {copy.createYear}
             </button>
           </section>
         )}
@@ -800,19 +1051,19 @@ function App() {
         <section className="ledger" aria-busy={loading}>
           <div className="ledger-head">
             <div>
-              <span className="eyebrow">// OFFICIAL GERMAN TAX FORM FIELD · {year}</span>
+              <span className="eyebrow">// {copy.officialFieldEyebrow.toUpperCase()} · {year}</span>
               <h2>{CATEGORY}</h2>
             </div>
             <div className="ledger-total">
-              <span>{receipts.length} {receipts.length === 1 ? "receipt" : "receipts"}</span>
-              <strong>{money(total)}</strong>
+              <span>{receipts.length} {receipts.length === 1 ? copy.receipt : copy.receipts}</span>
+              <strong>{money(total, language)}</strong>
             </div>
           </div>
 
           {!loading && !receipts.length && (
             <div className="empty-state">
-              <h3>No receipts for {year}</h3>
-              <p>Upload an original or add a receipt manually.</p>
+              <h3>{copy.noReceiptsStart} {year}</h3>
+              <p>{copy.noReceiptsHelp}</p>
             </div>
           )}
 
@@ -829,21 +1080,21 @@ function App() {
                     setSelected(receipt);
                   }}
                 >
-                  <span className="date-cell">{new Date(`${receipt.expense_date}T00:00:00`).toLocaleDateString("en-GB")}</span>
+                  <span className="date-cell">{new Date(`${receipt.expense_date}T00:00:00`).toLocaleDateString(language === "de" ? "de-DE" : "en-GB")}</span>
                   <span className="description-cell">
-                    <strong>{receipt.description || "No description"}</strong>
-                    <small>{receipt.seller_name || receipt.original_filename || "Manual entry"}</small>
+                    <strong>{receipt.description || copy.noDescription}</strong>
+                    <small>{receipt.seller_name || receipt.original_filename || copy.manualEntry}</small>
                   </span>
                   <span className="status-cell">
-                    {receipt.gwg_flag ? <span className="tag tag-warning">Review depreciation</span> : (
+                    {receipt.gwg_flag ? <span className="tag tag-warning">{copy.reviewDepreciation}</span> : (
                       <span className={`tag ${receipt.status === "complete" ? "tag-complete" : ""}`}>
-                        {receipt.status === "complete" ? "Complete" : "Draft"}
+                        {receipt.status === "complete" ? copy.complete : copy.draft}
                       </span>
                     )}
                   </span>
                   <span className="amount-cell">
-                    <strong>{money(receipt.gwg_flag ? 0 : receipt.deductible_cents)}</strong>
-                    <small>of {money(receipt.amount_cents)}</small>
+                    <strong>{money(receipt.gwg_flag ? 0 : receipt.deductible_cents, language)}</strong>
+                    <small>{copy.of} {money(receipt.amount_cents, language)}</small>
                   </span>
                 </button>
               ))}
@@ -853,13 +1104,26 @@ function App() {
       </main>
 
       <footer className="app-footer">
-        <span>belegbox · private receipt archive</span>
-        <span>No direct tax-filing integration, automated submission, or tax advice.</span>
+        <span>belegbox · {copy.privateArchive}</span>
+        <a
+          className="footer-github"
+          href="https://github.com/cougz/belegbox"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={copy.githubLabel}
+        >
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0 1 12 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0 0 22 12.017C22 6.484 17.522 2 12 2Z" />
+          </svg>
+          cougz/belegbox
+        </a>
       </footer>
 
       {selected && (
         <ReceiptEditor
           receipt={selected}
+          copy={copy}
+          language={language}
           aiPrefill={aiPrefill}
           onClose={() => {
             setAiPrefill(null);
@@ -867,34 +1131,40 @@ function App() {
           }}
           onSaved={(saved) => {
             setSelected(saved);
-            if (saved.tax_year !== year) {
-              setYear(saved.tax_year);
-              void loadReceipts(saved.tax_year);
-            } else {
-              setReceipts((values) => values.map((value) => value.id === saved.id ? saved : value));
-            }
+            saveReceiptInLedger(saved);
           }}
           onDelete={(receipt) => void deleteReceipt(receipt)}
-          onDuplicate={(receipt) => void duplicateReceipt(receipt)}
+          queueProgress={null}
+          configs={configs}
         />
       )}
 
-      {manualOpen && (
-        <ManualEntry
-          year={year}
-          onClose={() => setManualOpen(false)}
-          onCreated={(receipt) => {
-            setManualOpen(false);
-            setYear(receipt.tax_year);
-            if (receipt.tax_year === year) {
-              setReceipts((values) => [receipt, ...values]);
-            } else {
-              setReceipts([receipt]);
-            }
-            void loadReceipts(receipt.tax_year).catch((reason) => {
-              setError(reason instanceof Error ? reason.message : "Could not refresh receipts");
-            });
+      {currentQueueItem?.status === "ready" && currentQueueItem.receipt && (
+        <ReceiptEditor
+          key={currentQueueItem.id}
+          receipt={currentQueueItem.receipt}
+          copy={copy}
+          language={language}
+          aiPrefill={currentQueueItem.aiPrefill ?? null}
+          onClose={closeReceiptQueue}
+          onSaved={(saved) => {
+            saveReceiptInLedger(saved);
+            setReceiptQueue((items) => items.filter((item) => item.id !== currentQueueItem.id));
           }}
+          onDelete={() => undefined}
+          queueProgress={{ current: currentQueueItem.position, total: queueTotal }}
+          configs={configs}
+        />
+      )}
+
+      {currentQueueItem && currentQueueItem.status !== "ready" && (
+        <ReceiptQueueStatus
+          item={currentQueueItem}
+          total={queueTotal}
+          copy={copy}
+          onClose={closeReceiptQueue}
+          onRetry={() => retryQueueItem(currentQueueItem)}
+          onSkip={() => setReceiptQueue((items) => items.filter((item) => item.id !== currentQueueItem.id))}
         />
       )}
     </>

@@ -6,6 +6,7 @@ import type { AppEnv, Owner } from "./types";
 
 let miniflare: Miniflare;
 let db: D1Database;
+let receipts: R2Bucket;
 
 const owner: Owner = {
   id: "463aaecd-fdc7-455d-ab85-bb9a951c90a3",
@@ -16,10 +17,12 @@ beforeAll(async () => {
   miniflare = new Miniflare({
     compatibilityDate: "2026-08-06",
     d1Databases: ["DB"],
+    r2Buckets: ["RECEIPTS"],
     modules: true,
     script: "export default { fetch() { return new Response('ok') } }",
   });
   db = await miniflare.getD1Database("DB");
+  receipts = await miniflare.getR2Bucket("RECEIPTS");
   await db.batch([
     db.prepare(`CREATE TABLE tax_year_config (
       owner_id TEXT NOT NULL,
@@ -123,5 +126,64 @@ describe("manual receipt entry", () => {
 
     expect(response.status).toBe(400);
     expect(count?.count).toBe(1);
+  });
+});
+
+describe("receipt upload", () => {
+  it("reuses a client receipt ID when an upload response is retried", async () => {
+    const receiptId = "f42b36e7-58bb-43cc-8916-9572c901c627";
+    const upload = () => {
+      const form = new FormData();
+      form.set("receipt_id", receiptId);
+      form.set("file", new File([new Uint8Array([0xff, 0xd8, 0xff, 0x00])], "receipt.jpg", { type: "image/jpeg" }));
+      return app().request("https://app.example/receipts/upload", {
+        method: "POST",
+        body: form,
+      }, {
+        DB: db,
+        RECEIPTS: receipts,
+        AI_PREFILL_ENABLED: "false",
+      } as AppEnv["Bindings"]);
+    };
+
+    const first = await upload();
+    const retry = await upload();
+    const count = await db.prepare("SELECT COUNT(*) AS count FROM receipts WHERE id = ?")
+      .bind(receiptId).first<{ count: number }>();
+
+    expect(first.status).toBe(201);
+    expect(retry.status).toBe(200);
+    expect(count?.count).toBe(1);
+    await expect(retry.json()).resolves.toMatchObject({
+      receipt: { id: receiptId, original_filename: "receipt.jpg" },
+      ai_prefill: { status: "disabled" },
+    });
+  });
+
+  it("keeps the winning original when the same upload starts concurrently", async () => {
+    const receiptId = "5103acda-9fc0-48cd-a2a5-57dbdb82b3a6";
+    const upload = () => {
+      const form = new FormData();
+      form.set("receipt_id", receiptId);
+      form.set("file", new File([new Uint8Array([0xff, 0xd8, 0xff, 0x01])], "concurrent.jpg", { type: "image/jpeg" }));
+      return app().request("https://app.example/receipts/upload", {
+        method: "POST",
+        body: form,
+      }, {
+        DB: db,
+        RECEIPTS: receipts,
+        AI_PREFILL_ENABLED: "false",
+      } as AppEnv["Bindings"]);
+    };
+
+    const responses = await Promise.all([upload(), upload()]);
+    const row = await db.prepare("SELECT r2_key FROM receipts WHERE id = ?")
+      .bind(receiptId).first<{ r2_key: string }>();
+    const objects = await receipts.list({ prefix: `receipts/${owner.id}/${receiptId}/` });
+
+    expect(responses.map((response) => response.status).sort()).toEqual([200, 201]);
+    expect(row?.r2_key).toBeTruthy();
+    expect(await receipts.get(row!.r2_key)).not.toBeNull();
+    expect(objects.objects).toHaveLength(1);
   });
 });
