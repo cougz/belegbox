@@ -178,7 +178,7 @@ async function buildPdf(bucket: R2Bucket, data: Awaited<ReturnType<typeof export
   };
 
   line(`Anlage N - Work equipment expenses ${data.tax_year}`, 20, true);
-  line(`Created: ${new Date(data.generated_at).toLocaleString("en-GB")}`, 9, false, rgb(0.4, 0.4, 0.4));
+  line(`Created: ${new Date(data.generated_at).toLocaleString("en-GB", { timeZone: "Europe/Berlin" })}`, 9, false, rgb(0.4, 0.4, 0.4));
   y -= 10;
 
   line(CATEGORY, 13, true);
