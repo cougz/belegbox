@@ -24,13 +24,6 @@ beforeAll(async () => {
   db = await miniflare.getD1Database("DB");
   receipts = await miniflare.getR2Bucket("RECEIPTS");
   await db.batch([
-    db.prepare(`CREATE TABLE tax_year_config (
-      owner_id TEXT NOT NULL,
-      tax_year INTEGER NOT NULL,
-      gwg_limit_cents INTEGER NOT NULL,
-      updated_at TEXT NOT NULL,
-      PRIMARY KEY (owner_id, tax_year)
-    ) STRICT`),
     db.prepare(`CREATE TABLE receipts (
       id TEXT PRIMARY KEY,
       created_at TEXT NOT NULL,
@@ -53,10 +46,8 @@ beforeAll(async () => {
       r2_key TEXT,
       original_filename TEXT,
       mime_type TEXT,
-      file_size INTEGER,
-      gwg_flag INTEGER NOT NULL DEFAULT 0
+      file_size INTEGER
     ) STRICT`),
-    db.prepare("INSERT INTO tax_year_config VALUES (?, 2026, 80000, '2026-01-01T00:00:00.000Z')").bind(owner.id),
   ]);
 });
 

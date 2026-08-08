@@ -27,19 +27,6 @@ beforeAll(async () => {
       updated_at TEXT NOT NULL,
       UNIQUE (access_issuer, access_subject)
     ) STRICT`),
-    db.prepare(`CREATE TABLE tax_year_defaults (
-      tax_year INTEGER PRIMARY KEY,
-      gwg_limit_cents INTEGER NOT NULL,
-      updated_at TEXT NOT NULL
-    ) STRICT`),
-    db.prepare("INSERT INTO tax_year_defaults VALUES (2026, 80000, '2026-01-01T00:00:00.000Z')"),
-    db.prepare(`CREATE TABLE tax_year_config (
-      owner_id TEXT NOT NULL,
-      tax_year INTEGER NOT NULL,
-      gwg_limit_cents INTEGER NOT NULL,
-      updated_at TEXT NOT NULL,
-      PRIMARY KEY (owner_id, tax_year)
-    ) STRICT`),
     db.prepare(`CREATE TABLE receipts (
       id TEXT PRIMARY KEY,
       owner_id TEXT NOT NULL,
@@ -49,7 +36,6 @@ beforeAll(async () => {
       created_at TEXT NOT NULL,
       description TEXT NOT NULL,
       amount_cents INTEGER NOT NULL,
-      gwg_flag INTEGER NOT NULL,
       r2_key TEXT,
       original_filename TEXT,
       mime_type TEXT
@@ -88,21 +74,17 @@ describe("UUID owner isolation", () => {
     expect(firstAgain.id).toBe(first.id);
   });
 
-  it("creates separate year settings and R2 prefixes", async () => {
-    const configs = await db.prepare(
-      "SELECT owner_id FROM tax_year_config ORDER BY owner_id",
-    ).all<{ owner_id: string }>();
-    expect(configs.results.map((row) => row.owner_id).sort()).toEqual([first.id, second.id].sort());
+  it("assigns distinct R2 key prefixes per owner", () => {
     expect(receiptObjectKey(first.id, "receipt-id")).toBe(`receipts/${first.id}/receipt-id`);
     expect(receiptObjectKey(second.id, "receipt-id")).not.toBe(receiptObjectKey(first.id, "receipt-id"));
   });
 
   it("returns only rows belonging to the resolved owner", async () => {
     await db.batch([
-      db.prepare("INSERT INTO receipts VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-        .bind("receipt-a", first.id, first.email, 2026, "2026-01-01", "2026-01-01", "First receipt", 1000, 0, null, null, null),
-      db.prepare("INSERT INTO receipts VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-        .bind("receipt-b", second.id, second.email, 2026, "2026-01-02", "2026-01-02", "Second receipt", 2000, 0, null, null, null),
+      db.prepare("INSERT INTO receipts VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+        .bind("receipt-a", first.id, first.email, 2026, "2026-01-01", "2026-01-01", "First receipt", 1000, null, null, null),
+      db.prepare("INSERT INTO receipts VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+        .bind("receipt-b", second.id, second.email, 2026, "2026-01-02", "2026-01-02", "Second receipt", 2000, null, null, null),
     ]);
 
     const app = new Hono<AppEnv>();

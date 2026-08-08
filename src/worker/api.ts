@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { extractReceiptSuggestions } from "./ocr";
 import { receiptObjectKey } from "./storage";
-import { CATEGORY, type AppEnv, type Category, type ReceiptRow, type TaxYearConfig } from "./types";
+import { CATEGORY, type AppEnv, type Category, type ReceiptRow } from "./types";
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
 const RECEIPT_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -31,24 +31,12 @@ interface ManualReceiptInput {
   notes: string;
 }
 
-function receiptForClient(receipt: ReceiptRow & { effective_gwg_flag?: number }) {
-  const {
-    owner_id: _ownerId,
-    r2_key: _r2Key,
-    effective_gwg_flag: effectiveGwgFlag,
-    ...publicReceipt
-  } = receipt;
+function receiptForClient(receipt: ReceiptRow) {
+  const { owner_id: _ownerId, r2_key: _r2Key, ...publicReceipt } = receipt;
   return {
     ...publicReceipt,
-    gwg_flag: effectiveGwgFlag === undefined ? receipt.gwg_flag : effectiveGwgFlag,
     has_file: Boolean(receipt.r2_key),
   };
-}
-
-function configForClient(config: TaxYearConfig | null) {
-  if (!config) return null;
-  const { owner_id: _ownerId, ...publicConfig } = config;
-  return publicConfig;
 }
 
 function jsonError(c: { json: (body: unknown, status: 400 | 404 | 409 | 413 | 415 | 422) => Response }, message: string, status: 400 | 404 | 409 | 413 | 415 | 422 = 400) {
@@ -163,11 +151,6 @@ function fileType(bytes: Uint8Array): string | null {
   return null;
 }
 
-async function configFor(db: D1Database, ownerId: string, year: number): Promise<TaxYearConfig | null> {
-  return db.prepare("SELECT * FROM tax_year_config WHERE owner_id = ? AND tax_year = ?")
-    .bind(ownerId, year).first<TaxYearConfig>();
-}
-
 function draftValues(filename = "Manual entry") {
   const date = new Date().toISOString().slice(0, 10);
   return {
@@ -182,39 +165,11 @@ export const api = new Hono<AppEnv>();
 
 api.get("/session", (c) => c.json({ email: c.get("owner").email }));
 
-api.get("/config", async (c) => {
+api.get("/tax-years", async (c) => {
   const result = await c.env.DB.prepare(
-    "SELECT * FROM tax_year_config WHERE owner_id = ? ORDER BY tax_year DESC",
-  ).bind(c.get("owner").id).all<TaxYearConfig>();
-  return c.json({ config: result.results.map(configForClient) });
-});
-
-api.put("/config/:year", async (c) => {
-  const year = Number(c.req.param("year"));
-  const value = await c.req.json<Record<string, unknown>>().catch(() => null);
-  if (!Number.isInteger(year) || year < 2000 || year > 2200 || !value) {
-    return jsonError(c, "Invalid tax year");
-  }
-  if (!Number.isInteger(value.gwg_limit_cents) || (value.gwg_limit_cents as number) < 0) {
-    return jsonError(c, "The immediate write-off threshold must be a non-negative integer amount in cents");
-  }
-  const owner = c.get("owner");
-  const updatedAt = new Date().toISOString();
-  const updateConfig = c.env.DB.prepare(
-    `INSERT INTO tax_year_config (owner_id, tax_year, gwg_limit_cents, updated_at)
-    VALUES (?, ?, ?, ?)
-    ON CONFLICT(owner_id, tax_year) DO UPDATE SET
-      gwg_limit_cents = excluded.gwg_limit_cents,
-      updated_at = excluded.updated_at`,
-  ).bind(owner.id, year, value.gwg_limit_cents, updatedAt);
-  const recalculateGwg = c.env.DB.prepare(
-    `UPDATE receipts SET
-      gwg_flag = CASE WHEN amount_cents > ? THEN 1 ELSE 0 END,
-      updated_at = ?
-    WHERE owner_id = ? AND tax_year = ?`,
-  ).bind(value.gwg_limit_cents, updatedAt, owner.id, year);
-  await c.env.DB.batch([updateConfig, recalculateGwg]);
-  return c.json({ config: configForClient(await configFor(c.env.DB, owner.id, year)) });
+    "SELECT DISTINCT tax_year FROM receipts WHERE owner_id = ? ORDER BY tax_year DESC",
+  ).bind(c.get("owner").id).all<{ tax_year: number }>();
+  return c.json({ tax_years: result.results.map((row) => row.tax_year) });
 });
 
 api.get("/receipts", async (c) => {
@@ -229,22 +184,16 @@ api.get("/receipts", async (c) => {
     values.push(parsed);
   }
   const result = await c.env.DB.prepare(
-    `SELECT r.*, CASE WHEN r.amount_cents > cfg.gwg_limit_cents THEN 1 ELSE 0 END AS effective_gwg_flag
-     FROM receipts r
-     JOIN tax_year_config cfg ON cfg.owner_id = r.owner_id AND cfg.tax_year = r.tax_year
+    `SELECT * FROM receipts r
      WHERE ${conditions.join(" AND ")} ORDER BY r.expense_date DESC, r.created_at DESC`,
-  ).bind(...values).all<ReceiptRow & { effective_gwg_flag: number }>();
+  ).bind(...values).all<ReceiptRow>();
   return c.json({ receipts: result.results.map(receiptForClient) });
 });
 
 api.get("/receipts/:id", async (c) => {
   const receipt = await c.env.DB.prepare(
-    `SELECT r.*, CASE WHEN r.amount_cents > cfg.gwg_limit_cents THEN 1 ELSE 0 END AS effective_gwg_flag
-     FROM receipts r
-     JOIN tax_year_config cfg ON cfg.owner_id = r.owner_id AND cfg.tax_year = r.tax_year
-     WHERE r.id = ? AND r.owner_id = ?`,
-  ).bind(c.req.param("id"), c.get("owner").id)
-    .first<ReceiptRow & { effective_gwg_flag: number }>();
+    "SELECT * FROM receipts WHERE id = ? AND owner_id = ?",
+  ).bind(c.req.param("id"), c.get("owner").id).first<ReceiptRow>();
   return receipt ? c.json({ receipt: receiptForClient(receipt) }) : jsonError(c, "Receipt not found", 404);
 });
 
@@ -252,20 +201,13 @@ api.post("/receipts/manual", async (c) => {
   const input = parseManualReceiptInput(await c.req.json().catch(() => null));
   if (!input) return jsonError(c, "Manual receipt data is invalid");
   const owner = c.get("owner");
-  if (!(await configFor(c.env.DB, owner.id, input.tax_year))) {
-    return jsonError(c, "Year settings are missing for this tax year", 422);
-  }
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
   await c.env.DB.prepare(
     `INSERT INTO receipts (
       id, created_at, updated_at, owner_id, owner_email, status, category, description, amount_cents,
-      business_use_pct, expense_date, tax_year, seller_name, notes, gwg_flag
-    ) VALUES (?, ?, ?, ?, ?, 'complete', ?, ?, ?, ?, ?, ?, ?, ?,
-      CASE WHEN ? > (
-        SELECT gwg_limit_cents FROM tax_year_config WHERE owner_id = ? AND tax_year = ?
-      ) THEN 1 ELSE 0 END
-    )`,
+      business_use_pct, expense_date, tax_year, seller_name, notes
+    ) VALUES (?, ?, ?, ?, ?, 'complete', ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).bind(
     id,
     now,
@@ -280,9 +222,6 @@ api.post("/receipts/manual", async (c) => {
     input.tax_year,
     input.seller_name,
     input.notes,
-    input.amount_cents,
-    owner.id,
-    input.tax_year,
   ).run();
   const receipt = await c.env.DB.prepare("SELECT * FROM receipts WHERE id = ? AND owner_id = ?")
     .bind(id, owner.id).first<ReceiptRow>();
@@ -321,9 +260,6 @@ api.post("/receipts/upload", async (c) => {
   }
 
   const draft = draftValues(file.name.slice(0, 500));
-  if (!(await configFor(c.env.DB, owner.id, draft.tax_year))) {
-    return jsonError(c, "Year settings are missing for the current year", 422);
-  }
   const now = new Date().toISOString();
   const r2Key = `${receiptObjectKey(owner.id, id)}/${crypto.randomUUID()}`;
   await c.env.RECEIPTS.put(r2Key, file, {
@@ -374,104 +310,16 @@ api.post("/receipts/upload", async (c) => {
   }, created ? 201 : 200);
 });
 
-api.post("/import/json", async (c) => {
-  const contentLength = Number(c.req.header("Content-Length") ?? 0);
-  if (Number.isFinite(contentLength) && contentLength > 2 * 1024 * 1024) {
-    return jsonError(c, "JSON backups may be at most 2 MB", 413);
-  }
-  const backup = await c.req.json<Record<string, unknown>>().catch(() => null);
-  if (
-    !backup ||
-    backup.schema !== "belegbox-export-v1" ||
-    !Number.isInteger(backup.tax_year) ||
-    (backup.tax_year as number) < 2000 ||
-    (backup.tax_year as number) > 2200 ||
-    !Array.isArray(backup.categories) ||
-    !backup.config ||
-    typeof backup.config !== "object"
-  ) {
-    return jsonError(c, "This is not a valid belegbox JSON backup");
-  }
-  const year = backup.tax_year as number;
-  const importedConfig = backup.config as Record<string, unknown>;
-  if (
-    importedConfig.tax_year !== year ||
-    !Number.isInteger(importedConfig.gwg_limit_cents) ||
-    (importedConfig.gwg_limit_cents as number) < 0
-  ) {
-    return jsonError(c, "The backup contains invalid year settings");
-  }
-  const owner = c.get("owner");
-  const existingConfig = await configFor(c.env.DB, owner.id, year);
-  if (existingConfig && existingConfig.gwg_limit_cents !== importedConfig.gwg_limit_cents) {
-    return jsonError(c, "Existing year settings differ from the backup", 409);
-  }
-  const validGroups = backup.categories.every((group) =>
-    Boolean(
-      group &&
-      typeof group === "object" &&
-      (group as { category?: unknown }).category === CATEGORY &&
-      Array.isArray((group as { items?: unknown }).items),
-    )
-  );
-  if (!validGroups) return jsonError(c, "The backup contains an invalid work-equipment group");
-  const items = backup.categories.flatMap((group) => (group as { items: unknown[] }).items);
-  if (items.length > 40) return jsonError(c, "A single import may contain at most 40 receipts");
-
-  const parsed = items.map(parseReceiptInput);
-  if (parsed.some((item) => !item || item.tax_year !== year)) {
-    return jsonError(c, "The backup contains invalid receipt data");
-  }
-  const now = new Date().toISOString();
-  const configStatement = c.env.DB.prepare(
-    `INSERT INTO tax_year_config (owner_id, tax_year, gwg_limit_cents, updated_at)
-     VALUES (?, ?, ?, ?) ON CONFLICT(owner_id, tax_year) DO NOTHING`,
-  ).bind(owner.id, year, importedConfig.gwg_limit_cents, now);
-  const statements = (parsed as ReceiptInput[]).map((item, index) => {
-    const source = items[index] as Record<string, unknown>;
-    const originalFilename = text(source.original_filename, 500);
-    const mimeType = text(source.mime_type, 100);
-    const fileSize = source.file_size === null || source.file_size === undefined
-      ? null
-      : Number.isInteger(source.file_size) && (source.file_size as number) >= 0
-        ? source.file_size
-        : null;
-    return c.env.DB.prepare(
-      `INSERT INTO receipts (
-        id, created_at, updated_at, owner_id, owner_email, status, category, description, amount_cents,
-        business_use_pct, expense_date, tax_year, seller_name, seller_address, invoice_number,
-        payment_method, notes, original_filename, mime_type, file_size, gwg_flag
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-        CASE WHEN ? > (
-          SELECT gwg_limit_cents FROM tax_year_config WHERE owner_id = ? AND tax_year = ?
-        ) THEN 1 ELSE 0 END
-      )`,
-    ).bind(
-      crypto.randomUUID(), now, now, owner.id, owner.email, item.status, item.category, item.description,
-      item.amount_cents, item.business_use_pct, item.expense_date, item.tax_year, item.seller_name,
-      item.seller_address, item.invoice_number, item.payment_method, item.notes, originalFilename,
-      mimeType, fileSize, item.amount_cents, owner.id, item.tax_year,
-    );
-  });
-  await c.env.DB.batch([configStatement, ...statements]);
-  return c.json({ imported: statements.length, tax_year: year }, 201);
-});
-
 api.put("/receipts/:id", async (c) => {
   const input = parseReceiptInput(await c.req.json().catch(() => null));
   if (!input) return jsonError(c, "Receipt data is invalid");
   const owner = c.get("owner");
-  const config = await configFor(c.env.DB, owner.id, input.tax_year);
-  if (!config) return jsonError(c, "Year settings are missing for this tax year", 422);
   const updatedAt = new Date().toISOString();
   const result = await c.env.DB.prepare(
     `UPDATE receipts SET
       updated_at = ?, status = ?, category = ?, description = ?, amount_cents = ?,
       business_use_pct = ?, expense_date = ?, tax_year = ?, seller_name = ?, seller_address = ?,
-      invoice_number = ?, payment_method = ?, notes = ?,
-      gwg_flag = CASE WHEN ? > (
-        SELECT gwg_limit_cents FROM tax_year_config WHERE owner_id = ? AND tax_year = ?
-      ) THEN 1 ELSE 0 END
+      invoice_number = ?, payment_method = ?, notes = ?
     WHERE id = ? AND owner_id = ? RETURNING *`,
   ).bind(
     updatedAt,
@@ -487,9 +335,6 @@ api.put("/receipts/:id", async (c) => {
     input.invoice_number,
     input.payment_method,
     input.notes,
-    input.amount_cents,
-    owner.id,
-    input.tax_year,
     c.req.param("id"),
     owner.id,
   ).first<ReceiptRow>();
@@ -516,18 +361,13 @@ api.post("/receipts/:id/duplicate", async (c) => {
       `INSERT INTO receipts (
         id, created_at, updated_at, owner_id, owner_email, status, category, description, amount_cents,
         business_use_pct, expense_date, tax_year, seller_name, seller_address, invoice_number,
-        payment_method, notes, r2_key, original_filename, mime_type, file_size, gwg_flag
-      ) VALUES (?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-        CASE WHEN ? > (
-          SELECT gwg_limit_cents FROM tax_year_config WHERE owner_id = ? AND tax_year = ?
-        ) THEN 1 ELSE 0 END
-      )`,
+        payment_method, notes, r2_key, original_filename, mime_type, file_size
+      ) VALUES (?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).bind(
       id, now, now, source.owner_id, source.owner_email, source.category, `${source.description.slice(0, 493)} (copy)`,
       source.amount_cents, source.business_use_pct, source.expense_date, source.tax_year,
       source.seller_name, source.seller_address, source.invoice_number, source.payment_method,
       source.notes, r2Key, source.original_filename, source.mime_type, source.file_size,
-      source.amount_cents, source.owner_id, source.tax_year,
     ).run();
   } catch (error) {
     if (r2Key) await c.env.RECEIPTS.delete(r2Key);

@@ -35,12 +35,6 @@ export async function ensureOwner(db: D1Database, identity: AuthIdentity): Promi
     user = { id: user.id, email: identity.email };
   }
 
-  await db.prepare(
-    `INSERT INTO tax_year_config (owner_id, tax_year, gwg_limit_cents, updated_at)
-     SELECT ?, tax_year, gwg_limit_cents, updated_at FROM tax_year_defaults WHERE 1
-     ON CONFLICT(owner_id, tax_year) DO NOTHING`,
-  ).bind(user.id).run();
-
   return user;
 }
 

@@ -56,12 +56,4 @@ export interface ReceiptRow {
   original_filename: string | null;
   mime_type: string | null;
   file_size: number | null;
-  gwg_flag: 0 | 1;
-}
-
-export interface TaxYearConfig {
-  owner_id: string;
-  tax_year: number;
-  gwg_limit_cents: number;
-  updated_at: string;
 }

@@ -29,12 +29,10 @@ const EN = {
   ocrTooLarge: "This image is too large for AI text recognition. Enter its fields manually.",
   ocrError: "AI text recognition failed. The original is stored safely; enter its fields manually.",
   ocrDisabled: "AI text recognition is disabled. Enter the receipt fields manually.",
-  depreciationWarning: "This purchase is above the year's depreciation threshold. It is excluded from the immediately deductible total and marked for separate review.",
   description: "Description / type of work item",
   amountEur: "Amount (EUR)",
   workUsePct: "Work use (%)",
   deductibleAmount: "Calculated deductible amount",
-  excludedReview: "Excluded from totals; review for depreciation",
   includedLedger: "Included in the ledger total",
   receiptDate: "Receipt date",
   taxYear: "Tax year",
@@ -68,19 +66,8 @@ const EN = {
   workUse: "work use",
   workUseHelp: "Leave at 100% when the item is only used for work.",
   filedUnder: "Filed under",
-  depreciationRule: "Depreciation rule",
-  thresholdStart: "Purchases over",
-  thresholdEnd: "are reviewed separately",
-  thresholdExplanation: "belegbox uses this amount as a sorting rule. Purchases above it are not added to the immediately deductible total and are marked for a separate depreciation review.",
-  thresholdLabel: "Separate review above (EUR)",
-  thresholdHelp: "Only change this if your tax setup requires a different limit. It does not change the amount stored on a receipt.",
-  saveRule: "Save rule",
-  ruleSaved: "Depreciation rule saved.",
-  ruleSaveError: "Could not save the depreciation rule",
   loadAppError: "Could not load the app",
   loadReceiptsError: "Could not load receipts",
-  noRuleToCopy: "There is no existing depreciation rule to copy.",
-  createRuleError: "Could not create the depreciation rule",
   deleteConfirmStart: "Permanently delete receipt",
   deleteError: "Could not delete the receipt",
   refreshError: "Could not refresh receipts",
@@ -89,23 +76,15 @@ const EN = {
   totalDeductible: "Total deductible amount",
   receipt: "receipt",
   receipts: "receipts",
-  depreciationItemsExcluded: "Items requiring depreciation review excluded",
   draftsOpen: "drafts open",
-  depreciationReview: "Depreciation review",
-  excludedFromTotal: "Excluded from the total deductible amount",
-  exports: "Exports",
-  exportHelp: "For tax filing and backup",
+  exportPdf: "Export PDF",
+  exportHelp: "Includes every uploaded receipt image or PDF",
   dropTitle: "Drop all receipt images or PDFs here",
   dropHelp: "Choose one or many. OCR starts immediately, then you review each receipt in order · maximum 20 MB each",
-  ruleMissingStart: "Depreciation rule for",
-  ruleMissingEnd: "is missing",
-  ruleMissingHelp: "Copy the most recent threshold and review it before use.",
-  createYear: "Create year",
   noReceiptsStart: "No receipts for",
   noReceiptsHelp: "Drop one or more receipts above to get started.",
   noDescription: "No description",
   manualEntry: "Manual entry",
-  reviewDepreciation: "Review depreciation",
   of: "of",
   privateArchive: "private receipt archive",
   githubLabel: "belegbox source code on GitHub",
@@ -137,12 +116,10 @@ const TEXT: Record<Language, Copy> = {
     ocrTooLarge: "Dieses Bild ist zu groß für die KI-Texterkennung. Bitte die Daten manuell eingeben.",
     ocrError: "Die KI-Texterkennung ist fehlgeschlagen. Das Original wurde sicher gespeichert; bitte die Daten manuell eingeben.",
     ocrDisabled: "Die KI-Texterkennung ist deaktiviert. Bitte die Belegdaten manuell eingeben.",
-    depreciationWarning: "Diese Anschaffung liegt über der Abschreibungsgrenze. Sie wird nicht zur sofort abziehbaren Summe gezählt und muss separat geprüft werden.",
     description: "Beschreibung / Art des Arbeitsmittels",
     amountEur: "Betrag (EUR)",
     workUsePct: "Berufliche Nutzung (%)",
     deductibleAmount: "Berechneter abziehbarer Betrag",
-    excludedReview: "Nicht in der Summe; Abschreibung prüfen",
     includedLedger: "In der Belegsumme enthalten",
     receiptDate: "Belegdatum",
     taxYear: "Steuerjahr",
@@ -176,19 +153,8 @@ const TEXT: Record<Language, Copy> = {
     workUse: "beruflich genutzt",
     workUseHelp: "Bei ausschließlich beruflicher Nutzung auf 100 % belassen.",
     filedUnder: "Zugeordnet zu",
-    depreciationRule: "Abschreibungsgrenze",
-    thresholdStart: "Anschaffungen über",
-    thresholdEnd: "werden separat geprüft",
-    thresholdExplanation: "belegbox nutzt diesen Betrag als Sortierregel. Anschaffungen darüber werden nicht zur sofort abziehbaren Summe gezählt, sondern für eine separate Abschreibungsprüfung markiert.",
-    thresholdLabel: "Separate Prüfung über einem Betrag von (EUR)",
-    thresholdHelp: "Nur ändern, wenn für deine steuerliche Situation eine andere Grenze gilt. Die Beträge auf den Belegen werden dadurch nicht verändert.",
-    saveRule: "Regel speichern",
-    ruleSaved: "Abschreibungsgrenze gespeichert.",
-    ruleSaveError: "Die Abschreibungsgrenze konnte nicht gespeichert werden",
     loadAppError: "Die Anwendung konnte nicht geladen werden",
     loadReceiptsError: "Die Belege konnten nicht geladen werden",
-    noRuleToCopy: "Es gibt keine vorhandene Abschreibungsgrenze zum Kopieren.",
-    createRuleError: "Die Abschreibungsgrenze konnte nicht angelegt werden",
     deleteConfirmStart: "Beleg endgültig löschen",
     deleteError: "Der Beleg konnte nicht gelöscht werden",
     refreshError: "Die Belege konnten nicht aktualisiert werden",
@@ -197,23 +163,15 @@ const TEXT: Record<Language, Copy> = {
     totalDeductible: "Gesamter abziehbarer Betrag",
     receipt: "Beleg",
     receipts: "Belege",
-    depreciationItemsExcluded: "Anschaffungen zur Abschreibungsprüfung ausgenommen",
     draftsOpen: "offene Entwürfe",
-    depreciationReview: "Abschreibungsprüfung",
-    excludedFromTotal: "Nicht im gesamten abziehbaren Betrag enthalten",
-    exports: "Exporte",
-    exportHelp: "Für Steuererklärung und Sicherung",
+    exportPdf: "PDF exportieren",
+    exportHelp: "Enthält jedes hochgeladene Belegbild oder PDF",
     dropTitle: "Alle Belegbilder oder PDFs hier ablegen",
     dropHelp: "Einen oder mehrere auswählen. OCR startet sofort, danach werden die Belege der Reihe nach geprüft · jeweils maximal 20 MB",
-    ruleMissingStart: "Abschreibungsgrenze für",
-    ruleMissingEnd: "fehlt",
-    ruleMissingHelp: "Die zuletzt verwendete Grenze kopieren und vor der Nutzung prüfen.",
-    createYear: "Jahr anlegen",
     noReceiptsStart: "Keine Belege für",
     noReceiptsHelp: "Zum Start einen oder mehrere Belege oben ablegen.",
     noDescription: "Keine Beschreibung",
     manualEntry: "Manueller Eintrag",
-    reviewDepreciation: "Abschreibung prüfen",
     of: "von",
     privateArchive: "privates Belegarchiv",
     githubLabel: "belegbox-Quellcode auf GitHub",
@@ -242,13 +200,6 @@ interface Receipt {
   original_filename: string | null;
   mime_type: string | null;
   file_size: number | null;
-  gwg_flag: 0 | 1;
-}
-
-interface YearConfig {
-  tax_year: number;
-  gwg_limit_cents: number;
-  updated_at: string;
 }
 
 interface Suggestions {
@@ -404,7 +355,6 @@ function ReceiptEditor({
   onDelete,
   aiPrefill,
   queueProgress,
-  configs,
 }: {
   receipt: Receipt;
   copy: Copy;
@@ -414,7 +364,6 @@ function ReceiptEditor({
   onDelete: (receipt: Receipt) => void;
   aiPrefill: AiPrefillInfo | null;
   queueProgress: { current: number; total: number } | null;
-  configs: YearConfig[];
 }) {
   const [draft, setDraft] = useState(receipt);
   const [saving, setSaving] = useState(false);
@@ -430,8 +379,6 @@ function ReceiptEditor({
   const set = <K extends keyof Receipt>(key: K, value: Receipt[K]) => {
     setDraft((current) => ({ ...current, [key]: value }));
   };
-  const gwgLimit = configs.find((config) => config.tax_year === draft.tax_year)?.gwg_limit_cents;
-  const requiresDepreciationReview = gwgLimit === undefined ? draft.gwg_flag === 1 : draft.amount_cents > gwgLimit;
 
   const save = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -523,7 +470,6 @@ function ReceiptEditor({
                 {aiPrefill.status === "disabled" && copy.ocrDisabled}
               </p>
             )}
-            {requiresDepreciationReview && <p className="notice notice-warning">{copy.depreciationWarning}</p>}
 
             <div className="form-grid">
               <label className="field span-2 receipt-description">
@@ -607,7 +553,7 @@ function ReceiptEditor({
             <div className="calculated">
               <span>{copy.deductibleAmount}</span>
               <strong>{money(Math.round(draft.amount_cents * draft.business_use_pct / 100), language)}</strong>
-              <small>{requiresDepreciationReview ? copy.excludedReview : copy.includedLedger}</small>
+              <small>{copy.includedLedger}</small>
             </div>
 
             <div className="receipt-actions">
@@ -717,77 +663,12 @@ function ConfirmDialog({
   );
 }
 
-function YearSettings({
-  config,
-  copy,
-  language,
-  onSaved,
-}: {
-  config: YearConfig;
-  copy: Copy;
-  language: Language;
-  onSaved: (config: YearConfig) => void;
-}) {
-  const [draft, setDraft] = useState(config);
-  const [message, setMessage] = useState("");
-  useEffect(() => setDraft(config), [config]);
-
-  const save = async (event: FormEvent) => {
-    event.preventDefault();
-    setMessage("");
-    try {
-      const result = await request<{ config: YearConfig }>(`/api/config/${draft.tax_year}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(draft),
-      });
-      onSaved(result.config);
-      setMessage(copy.ruleSaved);
-    } catch (reason) {
-      setMessage(reason instanceof Error ? reason.message : copy.ruleSaveError);
-    }
-  };
-
-  return (
-    <details className="settings-card">
-      <summary>
-        <span className="settings-summary-copy">
-          <span>{copy.depreciationRule} · {config.tax_year}</span>
-          <strong>{copy.thresholdStart} {money(config.gwg_limit_cents, language)} {copy.thresholdEnd}</strong>
-        </span>
-      </summary>
-      <form className="settings-grid" onSubmit={save}>
-        <p className="settings-explanation">{copy.thresholdExplanation}</p>
-        <label className="field compact-field">
-          <span>{copy.thresholdLabel}</span>
-          <input
-            aria-describedby="gwg-explanation"
-            type="number"
-            min="0"
-            step="0.01"
-            value={(draft.gwg_limit_cents / 100).toFixed(2)}
-            onChange={(event) => setDraft((current) => ({
-              ...current,
-              gwg_limit_cents: Math.max(0, Math.round(Number(event.target.value) * 100)),
-            }))}
-          />
-          <small className="field-help" id="gwg-explanation">
-            {copy.thresholdHelp}
-          </small>
-        </label>
-        <button className="button button-ghost" type="submit">{copy.saveRule}</button>
-        {message && <span className="settings-message" role="status">{message}</span>}
-      </form>
-    </details>
-  );
-}
-
 function App() {
   const currentYear = new Date().getFullYear();
   const [language, setLanguage] = useState<Language>(initialLanguage);
   const copy = TEXT[language];
   const [email, setEmail] = useState("");
-  const [configs, setConfigs] = useState<YearConfig[]>([]);
+  const [taxYears, setTaxYears] = useState<number[]>([]);
   const [year, setYear] = useState(() => initialTaxYear(currentYear));
   const startupYear = useRef(year).current;
   const [receipts, setReceipts] = useState<Receipt[]>([]);
@@ -850,11 +731,11 @@ function App() {
   useEffect(() => {
     void Promise.all([
       request<{ email: string }>("/api/session"),
-      request<{ config: YearConfig[] }>("/api/config"),
+      request<{ tax_years: number[] }>("/api/tax-years"),
       loadReceipts(startupYear),
-    ]).then(([session, configResult]) => {
+    ]).then(([session, taxYearsResult]) => {
       setEmail(session.email);
-      setConfigs(configResult.config);
+      setTaxYears(taxYearsResult.tax_years);
     }).catch((reason) => {
       setError(reason instanceof Error ? reason.message : copy.loadAppError);
     }).finally(() => setLoading(false));
@@ -968,6 +849,7 @@ function App() {
     if (saved.tax_year !== currentYearRef.current) {
       currentYearRef.current = saved.tax_year;
       setYear(saved.tax_year);
+      setTaxYears((years) => years.includes(saved.tax_year) ? years : [...years, saved.tax_year]);
       setReceipts([saved]);
       await loadReceipts(saved.tax_year).catch((reason) => {
         setError(reason instanceof Error ? reason.message : copy.refreshError);
@@ -979,27 +861,6 @@ function App() {
     setReceipts((values) => values.some((value) => value.id === saved.id)
       ? values.map((value) => value.id === saved.id ? saved : value)
       : [saved, ...values]);
-  };
-
-  const createYearConfig = async () => {
-    const source = configs.toSorted((a, b) => b.tax_year - a.tax_year)[0];
-    if (!source) {
-      setError(copy.noRuleToCopy);
-      return;
-    }
-    setError("");
-    try {
-      const result = await request<{ config: YearConfig }>(`/api/config/${year}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          gwg_limit_cents: source.gwg_limit_cents,
-        }),
-      });
-      setConfigs((values) => [...values, result.config].toSorted((a, b) => b.tax_year - a.tax_year));
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : copy.createRuleError);
-    }
   };
 
   const deleteReceipt = (receipt: Receipt) => {
@@ -1027,8 +888,7 @@ function App() {
     enqueueReceipts(event.dataTransfer.files);
   };
 
-  const total = receipts.reduce((sum, receipt) => sum + (receipt.gwg_flag ? 0 : receipt.deductible_cents), 0);
-  const selectedConfig = configs.find((config) => config.tax_year === year);
+  const total = receipts.reduce((sum, receipt) => sum + receipt.deductible_cents, 0);
   const currentQueueItem = receiptQueue[0];
 
   return (
@@ -1057,7 +917,7 @@ function App() {
             <label className="year-select">
               <span>{copy.taxYear}</span>
               <select value={year} onChange={(event) => void chooseYear(Number(event.target.value))}>
-                {Array.from(new Set([year, currentYear, ...configs.map((config) => config.tax_year)]))
+                {Array.from(new Set([year, currentYear, ...taxYears]))
                   .sort((a, b) => b - a)
                   .map((value) => <option key={value}>{value}</option>)}
               </select>
@@ -1071,26 +931,17 @@ function App() {
           <article className="stat-card total-card">
             <span>{copy.totalDeductible}</span>
             <strong>{money(total, language)}</strong>
-            <small>
-              {receipts.length} {receipts.length === 1 ? copy.receipt : copy.receipts} · {copy.depreciationItemsExcluded}
-            </small>
+            <small>{receipts.length} {receipts.length === 1 ? copy.receipt : copy.receipts}</small>
           </article>
           <article className="stat-card">
             <span>{copy.complete}</span>
             <strong>{receipts.filter((receipt) => receipt.status === "complete").length}</strong>
             <small>{receipts.filter((receipt) => receipt.status === "draft").length} {copy.draftsOpen}</small>
           </article>
-          <article className="stat-card warning-card">
-            <span>{copy.depreciationReview}</span>
-            <strong>{receipts.filter((receipt) => receipt.gwg_flag).length}</strong>
-            <small>{copy.excludedFromTotal}</small>
-          </article>
           <article className="stat-card data-card">
-            <span>{copy.exports} {year}</span>
+            <span>{copy.exportPdf} {year}</span>
             <div className="export-links">
-              {(["zip", "pdf", "csv", "json"] as const).map((format) => (
-                <a key={format} href={`/api/exports/${year}/${format}`}>{format.toUpperCase()}</a>
-              ))}
+              <a href={`/api/exports/${year}`}>PDF</a>
             </div>
             <small>{copy.exportHelp}</small>
           </article>
@@ -1120,28 +971,6 @@ function App() {
           <span className="drop-mark">+</span>
           <div><strong>{copy.dropTitle}</strong><small>{copy.dropHelp}</small></div>
         </label>
-
-        {selectedConfig ? (
-          <YearSettings
-            config={selectedConfig}
-            copy={copy}
-            language={language}
-            onSaved={(updated) => {
-              setConfigs((values) => values.map((value) => value.tax_year === updated.tax_year ? updated : value));
-              void loadReceipts(year);
-            }}
-          />
-        ) : (
-          <section className="missing-config">
-            <div>
-              <strong>{copy.ruleMissingStart} {year} {copy.ruleMissingEnd}</strong>
-              <small>{copy.ruleMissingHelp}</small>
-            </div>
-            <button className="button button-ghost" type="button" onClick={() => void createYearConfig()}>
-              {copy.createYear}
-            </button>
-          </section>
-        )}
 
         <section className="ledger" aria-busy={loading}>
           <div className="ledger-head">
@@ -1181,14 +1010,12 @@ function App() {
                     <small>{receipt.seller_name || receipt.original_filename || copy.manualEntry}</small>
                   </span>
                   <span className="status-cell">
-                    {receipt.gwg_flag ? <span className="tag tag-warning">{copy.reviewDepreciation}</span> : (
-                      <span className={`tag ${receipt.status === "complete" ? "tag-complete" : ""}`}>
-                        {receipt.status === "complete" ? copy.complete : copy.draft}
-                      </span>
-                    )}
+                    <span className={`tag ${receipt.status === "complete" ? "tag-complete" : ""}`}>
+                      {receipt.status === "complete" ? copy.complete : copy.draft}
+                    </span>
                   </span>
                   <span className="amount-cell">
-                    <strong>{money(receipt.gwg_flag ? 0 : receipt.deductible_cents, language)}</strong>
+                    <strong>{money(receipt.deductible_cents, language)}</strong>
                     <small>{copy.of} {money(receipt.amount_cents, language)}</small>
                   </span>
                 </button>
@@ -1231,7 +1058,6 @@ function App() {
           }}
           onDelete={deleteReceipt}
           queueProgress={null}
-          configs={configs}
         />
       )}
 
@@ -1249,7 +1075,6 @@ function App() {
           }}
           onDelete={() => undefined}
           queueProgress={{ current: currentQueueItem.position, total: queueTotal }}
-          configs={configs}
         />
       )}
 

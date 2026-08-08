@@ -94,8 +94,6 @@ Command used to apply checked-in migrations:
 npx wrangler d1 migrations apply belegbox --remote
 ```
 
-The migration seeds annual values as D1 data rather than application constants. Review these values for the relevant filing year; this project does not provide tax advice.
-
 ### 4. Access application and OAuth
 
 Cloudflare Wrangler does not provide commands for creating Access applications or identity providers. Configure these in **Cloudflare Zero Trust**:
@@ -155,20 +153,11 @@ There is no Pages or GitHub Actions deployment configuration.
 
 ## Data and exports
 
-Each receipt belongs to one internal UUID owner and stores integer cents, a 0-100 professional-use percentage, and a generated deductible amount. The only annual setting is the low-value asset immediate write-off threshold (`GWG`) in `tax_year_config`.
+Each receipt belongs to one internal UUID owner and stores integer cents, a 0-100 professional-use percentage, and a generated deductible amount. There is no depreciation/low-value-asset threshold logic — every receipt's professional share counts toward the total.
 
-An amount above the configured immediate write-off threshold is marked `gwg_flag`. Its computed professional share remains visible, but the dashboard and exports count it as zero and show a clear depreciation warning. The app never silently treats it as an immediate full deduction.
+Access identities are keyed by exact issuer and subject claims in `users`. Receipt rows use `owner_id`; private R2 objects are stored below `receipts/<owner-uuid>/`. Email changes do not merge accounts, and one user cannot address another user's D1 rows or R2 keys through any API route.
 
-Access identities are keyed by exact issuer and subject claims in `users`. Receipt and annual-setting rows use `owner_id`; private R2 objects are stored below `receipts/<owner-uuid>/`. Email changes do not merge accounts, and one user cannot address another user's D1 rows or R2 keys through any API route.
-
-Authenticated export routes produce:
-
-- `belege-<year>.zip`: streamed original files with ELSTER-oriented names
-- `anlage-n-<year>.pdf`: printable itemized work-equipment summary
-- `anlage-n-<year>.csv`: stable integer-cent backup rows
-- `anlage-n-<year>.json`: canonical backup that can be re-imported
-
-JSON re-import restores structured metadata as new records. Original binaries must be retained in the ZIP and uploaded separately because they are not embedded in JSON.
+The authenticated export route produces `anlage-n-<year>.pdf`: an itemized work-equipment summary followed by every uploaded receipt's original file rendered inline — source PDFs are page-copied in full, and JPEG/PNG images are embedded as full pages. Other original file types (WebP, GIF, AVIF, HEIC) can't be embedded by the PDF library in use; those receipts get a text note in the export instead of a rendered page.
 
 ## Source control
 
