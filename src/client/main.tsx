@@ -57,6 +57,7 @@ const EN = {
   skip: "Skip file",
   stopQueueConfirm: "Stop reviewing this batch? Uploaded receipts will remain saved as drafts.",
   queueUploadError: "This file could not be prepared",
+  receiptFieldsError: "Enter a description, an amount above zero, and a valid receipt date.",
   delete: "Delete",
   saveReceiptError: "Could not save the receipt",
   workUse: "work use",
@@ -159,6 +160,7 @@ const TEXT: Record<Language, Copy> = {
     skip: "Datei überspringen",
     stopQueueConfirm: "Stapelbearbeitung beenden? Bereits hochgeladene Belege bleiben als Entwürfe gespeichert.",
     queueUploadError: "Diese Datei konnte nicht vorbereitet werden",
+    receiptFieldsError: "Bitte Beschreibung, einen Betrag größer als null und ein gültiges Belegdatum eingeben.",
     delete: "Löschen",
     saveReceiptError: "Der Beleg konnte nicht gespeichert werden",
     workUse: "beruflich genutzt",
@@ -398,7 +400,7 @@ function ReceiptEditor({
   copy: Copy;
   language: Language;
   onClose: () => void;
-  onSaved: (receipt: Receipt) => void;
+  onSaved: (receipt: Receipt) => void | Promise<void>;
   onDelete: (receipt: Receipt) => void;
   aiPrefill: AiPrefillInfo | null;
   queueProgress: { current: number; total: number } | null;
@@ -417,8 +419,13 @@ function ReceiptEditor({
   const gwgLimit = configs.find((config) => config.tax_year === draft.tax_year)?.gwg_limit_cents;
   const requiresDepreciationReview = gwgLimit === undefined ? draft.gwg_flag === 1 : draft.amount_cents > gwgLimit;
 
-  const save = async (event: FormEvent) => {
+  const save = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!event.currentTarget.checkValidity()) {
+      setError(copy.receiptFieldsError);
+      event.currentTarget.reportValidity();
+      return;
+    }
     setSaving(true);
     setError("");
     try {
@@ -442,7 +449,7 @@ function ReceiptEditor({
         body: JSON.stringify(body),
       });
       setDraft(result.receipt);
-      onSaved(result.receipt);
+      await onSaved(result.receipt);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : copy.saveReceiptError);
     } finally {
@@ -486,7 +493,7 @@ function ReceiptEditor({
             )}
           </section>
 
-          <form className="receipt-form" onSubmit={save}>
+          <form className="receipt-form" onSubmit={save} noValidate>
             {error && <p className="notice notice-error" role="alert">{error}</p>}
             {aiPrefill?.status === "ready" && (
               <p className="notice notice-ai" role="status">
@@ -744,6 +751,7 @@ function App() {
   const [queueTotal, setQueueTotal] = useState(0);
   const pendingUploads = useRef<Set<Promise<void>>>(new Set());
   const currentYearRef = useRef(year);
+  const receiptLoadSequence = useRef(0);
   const receiptInputRef = useRef<HTMLInputElement>(null);
   const queueReturnFocus = useRef<HTMLElement | null>(null);
   const queueWasOpen = useRef(false);
@@ -776,7 +784,9 @@ function App() {
   }, [receiptQueue.length]);
 
   const loadReceipts = async (targetYear: number) => {
+    const sequence = ++receiptLoadSequence.current;
     const result = await request<{ receipts: Receipt[] }>(`/api/receipts?tax_year=${targetYear}`);
+    if (sequence !== receiptLoadSequence.current || targetYear !== currentYearRef.current) return;
     setReceipts(result.receipts);
   };
 
@@ -784,17 +794,17 @@ function App() {
     void Promise.all([
       request<{ email: string }>("/api/session"),
       request<{ config: YearConfig[] }>("/api/config"),
-      request<{ receipts: Receipt[] }>(`/api/receipts?tax_year=${startupYear}`),
-    ]).then(([session, configResult, receiptResult]) => {
+      loadReceipts(startupYear),
+    ]).then(([session, configResult]) => {
       setEmail(session.email);
       setConfigs(configResult.config);
-      setReceipts(receiptResult.receipts);
     }).catch((reason) => {
       setError(reason instanceof Error ? reason.message : copy.loadAppError);
     }).finally(() => setLoading(false));
   }, [startupYear]);
 
   const chooseYear = async (targetYear: number) => {
+    currentYearRef.current = targetYear;
     setYear(targetYear);
     setLoading(true);
     setError("");
@@ -888,15 +898,18 @@ function App() {
     startQueueUpload(retry);
   };
 
-  const saveReceiptInLedger = (saved: Receipt) => {
-    if (saved.tax_year !== year) {
+  const saveReceiptInLedger = async (saved: Receipt) => {
+    if (saved.tax_year !== currentYearRef.current) {
+      currentYearRef.current = saved.tax_year;
       setYear(saved.tax_year);
-      void loadReceipts(saved.tax_year).catch((reason) => {
+      setReceipts([saved]);
+      await loadReceipts(saved.tax_year).catch((reason) => {
         setError(reason instanceof Error ? reason.message : copy.refreshError);
       });
       return;
     }
 
+    receiptLoadSequence.current += 1;
     setReceipts((values) => values.some((value) => value.id === saved.id)
       ? values.map((value) => value.id === saved.id ? saved : value)
       : [saved, ...values]);
@@ -1138,7 +1151,7 @@ function App() {
           }}
           onSaved={(saved) => {
             setSelected(saved);
-            saveReceiptInLedger(saved);
+            return saveReceiptInLedger(saved);
           }}
           onDelete={(receipt) => void deleteReceipt(receipt)}
           queueProgress={null}
@@ -1154,9 +1167,9 @@ function App() {
           language={language}
           aiPrefill={currentQueueItem.aiPrefill ?? null}
           onClose={closeReceiptQueue}
-          onSaved={(saved) => {
-            saveReceiptInLedger(saved);
-            setReceiptQueue((items) => items.filter((item) => item.id !== currentQueueItem.id));
+          onSaved={async (saved) => {
+            await saveReceiptInLedger(saved);
+            setReceiptQueue((items) => items.filter((item) => item.id !== saved.id));
           }}
           onDelete={() => undefined}
           queueProgress={{ current: currentQueueItem.position, total: queueTotal }}
@@ -1166,6 +1179,7 @@ function App() {
 
       {currentQueueItem && currentQueueItem.status !== "ready" && (
         <ReceiptQueueStatus
+          key={currentQueueItem.id}
           item={currentQueueItem}
           total={queueTotal}
           copy={copy}

@@ -322,7 +322,7 @@ api.post("/receipts/upload", async (c) => {
   }
   const now = new Date().toISOString();
   const r2Key = `${receiptObjectKey(owner.id, id)}/${crypto.randomUUID()}`;
-  await c.env.RECEIPTS.put(r2Key, file.stream(), {
+  await c.env.RECEIPTS.put(r2Key, file, {
     httpMetadata: { contentType: mimeType },
   });
   let receipt: ReceiptRow | null = null;

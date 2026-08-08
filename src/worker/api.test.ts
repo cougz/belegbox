@@ -186,4 +186,54 @@ describe("receipt upload", () => {
     expect(await receipts.get(row!.r2_key)).not.toBeNull();
     expect(objects.objects).toHaveLength(1);
   });
+
+  it("completes two uploaded receipts independently", async () => {
+    const ids = [
+      "0b6e4873-921c-444d-bf7c-0d15b20fbc83",
+      "3df18cc0-93da-4d46-a135-e57c4c485eb5",
+    ];
+    const upload = (id: string, index: number) => {
+      const form = new FormData();
+      form.set("receipt_id", id);
+      form.set("file", new File([new Uint8Array([0xff, 0xd8, 0xff, index])], `receipt-${index}.jpg`, { type: "image/jpeg" }));
+      return app().request("https://app.example/receipts/upload", {
+        method: "POST",
+        body: form,
+      }, {
+        DB: db,
+        RECEIPTS: receipts,
+        AI_PREFILL_ENABLED: "false",
+      } as AppEnv["Bindings"]);
+    };
+    const save = (id: string, index: number) => app().request(`https://app.example/receipts/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        status: "complete",
+        category: "Aufwendungen für Arbeitsmittel",
+        description: `Receipt ${index}`,
+        amount_cents: 1000 + index,
+        business_use_pct: 100,
+        expense_date: "2026-08-08",
+        tax_year: 2026,
+        seller_name: "Test Shop",
+        seller_address: "",
+        invoice_number: "",
+        payment_method: "",
+        notes: "",
+      }),
+    }, { DB: db } as AppEnv["Bindings"]);
+
+    const uploads = await Promise.all(ids.map(upload));
+    const first = await save(ids[0], 1);
+    const second = await save(ids[1], 2);
+    const completed = await db.prepare(
+      "SELECT COUNT(*) AS count FROM receipts WHERE id IN (?, ?) AND status = 'complete'",
+    ).bind(...ids).first<{ count: number }>();
+
+    expect(uploads.map((response) => response.status)).toEqual([201, 201]);
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(completed?.count).toBe(2);
+  });
 });
