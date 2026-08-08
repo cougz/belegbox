@@ -77,6 +77,8 @@ h3 { font-weight: 500; }
 .button-ghost:hover { background: var(--recessed); }
 .button-danger { background: transparent; color: var(--danger); box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--danger) 25%, transparent); }
 .button-danger:hover { background: color-mix(in oklch, var(--danger) 8%, transparent); }
+.button-danger-solid { background: var(--danger); color: var(--on-accent); }
+.button-danger-solid:hover { background: color-mix(in oklch, var(--danger) 88%, black); }
 .file-button input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 
 .summary-grid { display: grid; grid-template-columns: 1.55fr repeat(3, 1fr); gap: 12px; }
@@ -207,6 +209,11 @@ h3 { font-weight: 500; }
 
 @keyframes queue-spin { to { transform: rotate(360deg); } }
 
+.confirm-card { width: min(100%, 420px); padding: 24px; border: 1px solid var(--line); border-radius: 22px; background: var(--canvas); box-shadow: 0 24px 80px rgba(0, 0, 0, .28); }
+.confirm-card h2 { font-size: 17px; font-weight: 500; }
+.confirm-message { margin-top: 10px; color: var(--text-muted); font-size: 14px; line-height: 1.5; }
+.confirm-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 22px; }
+
 .app-footer { max-width: 1480px; margin: 0 auto; padding: 24px; display: flex; justify-content: space-between; gap: 20px; border-top: 1px solid var(--line); color: var(--text-subtle); font-size: 11px; }
 .footer-github { display: inline-flex; align-items: center; gap: 6px; color: var(--text-subtle); text-decoration: none; transition: color var(--dur) var(--ease-out); }
 .footer-github:hover { color: var(--text); }
@@ -232,6 +239,7 @@ h3 { font-weight: 500; }
   .ledger-total { width: 100%; flex-direction: row; align-items: baseline; justify-content: space-between; }
   .drop-zone { justify-content: flex-start; }
   .receipt-overlay { align-items: end; padding: 0; }
+  .receipt-overlay:has(.confirm-card) { align-items: center; padding: 24px; }
   .receipt-card, .queue-card { max-height: calc(100dvh - 16px); border-radius: 22px 22px 0 0; border-bottom: 0; }
   .receipt-head { padding: 18px 16px 15px; }
   .receipt-head p { max-width: 260px; }

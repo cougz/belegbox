@@ -39,7 +39,6 @@ const EN = {
   receiptDate: "Receipt date",
   taxYear: "Tax year",
   seller: "Seller / vendor",
-  sellerAddress: "Seller address",
   invoiceNumber: "Invoice number",
   paymentMethod: "Payment method",
   paymentPlaceholder: "Card, bank transfer, cash",
@@ -55,10 +54,16 @@ const EN = {
   preparingReceiptHelp: "The original is being stored and read with OCR. Review starts as soon as it is ready.",
   retry: "Try again",
   skip: "Skip file",
-  stopQueueConfirm: "Stop reviewing this batch? Uploaded receipts will remain saved as drafts.",
+  stopQueueTitle: "Stop reviewing this batch?",
+  stopQueueBody: "Uploaded receipts will remain saved as drafts.",
+  stopQueueConfirmAction: "Stop reviewing",
+  stopQueueCancelAction: "Keep reviewing",
   queueUploadError: "This file could not be prepared",
   receiptFieldsError: "Enter a description, an amount above zero, and a valid receipt date.",
   delete: "Delete",
+  cancel: "Cancel",
+  deleteConfirmTitle: "Delete receipt?",
+  deleteConfirmUndo: "This cannot be undone.",
   saveReceiptError: "Could not save the receipt",
   workUse: "work use",
   workUseHelp: "Leave at 100% when the item is only used for work.",
@@ -142,7 +147,6 @@ const TEXT: Record<Language, Copy> = {
     receiptDate: "Belegdatum",
     taxYear: "Steuerjahr",
     seller: "Verkäufer / Anbieter",
-    sellerAddress: "Adresse des Verkäufers",
     invoiceNumber: "Rechnungsnummer",
     paymentMethod: "Zahlungsart",
     paymentPlaceholder: "Karte, Überweisung, Barzahlung",
@@ -158,10 +162,16 @@ const TEXT: Record<Language, Copy> = {
     preparingReceiptHelp: "Das Original wird gespeichert und per OCR ausgelesen. Sobald es bereit ist, kann es geprüft werden.",
     retry: "Erneut versuchen",
     skip: "Datei überspringen",
-    stopQueueConfirm: "Stapelbearbeitung beenden? Bereits hochgeladene Belege bleiben als Entwürfe gespeichert.",
+    stopQueueTitle: "Stapelbearbeitung beenden?",
+    stopQueueBody: "Bereits hochgeladene Belege bleiben als Entwürfe gespeichert.",
+    stopQueueConfirmAction: "Beenden",
+    stopQueueCancelAction: "Weiter prüfen",
     queueUploadError: "Diese Datei konnte nicht vorbereitet werden",
     receiptFieldsError: "Bitte Beschreibung, einen Betrag größer als null und ein gültiges Belegdatum eingeben.",
     delete: "Löschen",
+    cancel: "Abbrechen",
+    deleteConfirmTitle: "Beleg löschen?",
+    deleteConfirmUndo: "Dies kann nicht rückgängig gemacht werden.",
     saveReceiptError: "Der Beleg konnte nicht gespeichert werden",
     workUse: "beruflich genutzt",
     workUseHelp: "Bei ausschließlich beruflicher Nutzung auf 100 % belassen.",
@@ -556,10 +566,6 @@ function ReceiptEditor({
                 <small>{draft.business_use_pct}% {copy.workUse}</small>
               </summary>
               <div className="form-grid receipt-more-fields">
-                <label className="field span-2">
-                  <span>{copy.sellerAddress}</span>
-                  <textarea rows={2} maxLength={1000} value={draft.seller_address} onChange={(event) => set("seller_address", event.target.value)} />
-                </label>
                 <label className="field">
                   <span>{copy.invoiceNumber}</span>
                   <input maxLength={200} value={draft.invoice_number} onChange={(event) => set("invoice_number", event.target.value)} />
@@ -668,6 +674,39 @@ function ReceiptQueueStatus({
   );
 }
 
+function ConfirmDialog({
+  title,
+  message,
+  confirmLabel,
+  cancelLabel,
+  danger,
+  onConfirm,
+  onCancel,
+}: {
+  title: string;
+  message: string;
+  confirmLabel: string;
+  cancelLabel: string;
+  danger?: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  const modalRef = useModalFocus(onCancel);
+
+  return (
+    <div className="receipt-overlay" role="presentation">
+      <section ref={modalRef} className="confirm-card" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" tabIndex={-1}>
+        <h2 id="confirm-title">{title}</h2>
+        <p className="confirm-message">{message}</p>
+        <div className="confirm-actions">
+          <button className="button button-ghost" type="button" onClick={onCancel} data-initial-focus>{cancelLabel}</button>
+          <button className={`button ${danger ? "button-danger-solid" : "button-primary"}`} type="button" onClick={onConfirm}>{confirmLabel}</button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function YearSettings({
   config,
   copy,
@@ -749,6 +788,14 @@ function App() {
   const [aiPrefill, setAiPrefill] = useState<AiPrefillInfo | null>(null);
   const [receiptQueue, setReceiptQueue] = useState<ReceiptQueueItem[]>([]);
   const [queueTotal, setQueueTotal] = useState(0);
+  const [confirmState, setConfirmState] = useState<{
+    title: string;
+    message: string;
+    confirmLabel: string;
+    cancelLabel: string;
+    danger?: boolean;
+    onConfirm: () => void;
+  } | null>(null);
   const pendingUploads = useRef<Set<Promise<void>>>(new Set());
   const currentYearRef = useRef(year);
   const receiptLoadSequence = useRef(0);
@@ -879,16 +926,24 @@ function App() {
   };
 
   const closeReceiptQueue = () => {
-    if (!window.confirm(copy.stopQueueConfirm)) return;
-    const uploads = Array.from(pendingUploads.current);
-    const closedYear = year;
-    setReceiptQueue([]);
-    setQueueTotal(0);
-    void Promise.allSettled(uploads).then(() => {
-      if (currentYearRef.current !== closedYear) return;
-      return loadReceipts(closedYear).catch((reason) => {
-        setError(reason instanceof Error ? reason.message : copy.refreshError);
-      });
+    setConfirmState({
+      title: copy.stopQueueTitle,
+      message: copy.stopQueueBody,
+      confirmLabel: copy.stopQueueConfirmAction,
+      cancelLabel: copy.stopQueueCancelAction,
+      onConfirm: () => {
+        setConfirmState(null);
+        const uploads = Array.from(pendingUploads.current);
+        const closedYear = year;
+        setReceiptQueue([]);
+        setQueueTotal(0);
+        void Promise.allSettled(uploads).then(() => {
+          if (currentYearRef.current !== closedYear) return;
+          return loadReceipts(closedYear).catch((reason) => {
+            setError(reason instanceof Error ? reason.message : copy.refreshError);
+          });
+        });
+      },
     });
   };
 
@@ -936,15 +991,24 @@ function App() {
     }
   };
 
-  const deleteReceipt = async (receipt: Receipt) => {
-    if (!window.confirm(`${copy.deleteConfirmStart} "${receipt.description}"?`)) return;
-    try {
-      await request<void>(`/api/receipts/${receipt.id}`, { method: "DELETE" });
-      setSelected(null);
-      await loadReceipts(year);
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : copy.deleteError);
-    }
+  const deleteReceipt = (receipt: Receipt) => {
+    setConfirmState({
+      title: copy.deleteConfirmTitle,
+      message: `${copy.deleteConfirmStart} "${receipt.description}"? ${copy.deleteConfirmUndo}`,
+      confirmLabel: copy.delete,
+      cancelLabel: copy.cancel,
+      danger: true,
+      onConfirm: async () => {
+        setConfirmState(null);
+        try {
+          await request<void>(`/api/receipts/${receipt.id}`, { method: "DELETE" });
+          setSelected(null);
+          await loadReceipts(year);
+        } catch (reason) {
+          setError(reason instanceof Error ? reason.message : copy.deleteError);
+        }
+      },
+    });
   };
 
   const onDrop = (event: DragEvent) => {
@@ -1153,7 +1217,7 @@ function App() {
             setSelected(saved);
             return saveReceiptInLedger(saved);
           }}
-          onDelete={(receipt) => void deleteReceipt(receipt)}
+          onDelete={deleteReceipt}
           queueProgress={null}
           configs={configs}
         />
@@ -1186,6 +1250,18 @@ function App() {
           onClose={closeReceiptQueue}
           onRetry={() => retryQueueItem(currentQueueItem)}
           onSkip={() => setReceiptQueue((items) => items.filter((item) => item.id !== currentQueueItem.id))}
+        />
+      )}
+
+      {confirmState && (
+        <ConfirmDialog
+          title={confirmState.title}
+          message={confirmState.message}
+          confirmLabel={confirmState.confirmLabel}
+          cancelLabel={confirmState.cancelLabel}
+          danger={confirmState.danger}
+          onConfirm={confirmState.onConfirm}
+          onCancel={() => setConfirmState(null)}
         />
       )}
     </>

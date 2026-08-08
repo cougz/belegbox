@@ -136,15 +136,18 @@ export async function extractReceiptSuggestions(
       task: "query",
       image,
       question:
-        "Extract fields from this German purchase receipt. Return exactly one JSON object and no prose. " +
-        "Use null when a field is not clearly visible. Return these exact keys: " +
+        "Extract fields from this German purchase receipt (Kassenbon/Rechnung). Return exactly one JSON object " +
+        "and no prose. Use null when a field is not clearly visible. Return these exact keys: " +
         '{"seller_name":null,"seller_address":null,"invoice_number":null,' +
         '"expense_date":null,"amount_cents":null,"payment_method":null,"description":null}. ' +
-        "Format expense_date as YYYY-MM-DD. amount_cents must be the final gross total as an integer number of euro cents. " +
+        "expense_date is the date the purchase was made, usually labeled 'Datum' near the transaction time — " +
+        "not an expiry, warranty, or 'gültig bis' date. German receipts print dates as DD.MM.YYYY; read every digit " +
+        "carefully before converting, and format expense_date as YYYY-MM-DD. amount_cents must be the final gross " +
+        "total, usually labeled 'Summe', 'Gesamt', or 'zu zahlen', as an integer number of euro cents. " +
         "description is the purchased work item, not a generic receipt label.",
-      reasoning: false,
+      reasoning: true,
       temperature: 0,
-      max_tokens: 512,
+      max_tokens: 2048,
       stream: false,
     });
     const suggestions = parseReceiptSuggestions(result);
